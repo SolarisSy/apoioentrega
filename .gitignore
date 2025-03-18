@@ -47,4 +47,10 @@ temp/
 # Arquivos de backup
 *.bak
 *.backup
-*~ 
+*~
+
+# NÃO ignorar estes arquivos (necessários para deploy no Heroku)
+!package.json
+!package-lock.json
+!server.js
+!Procfile 
