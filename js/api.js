@@ -52,16 +52,24 @@ class ApiService {
         if (endpoint.startsWith('http')) {
             url = new URL(endpoint);
         } else {
-            // Construir URL relativa ao servidor
-            const base = window.location.origin;
+            // Determinar se estamos em ambiente de produção
+            const isProduction = window.location.hostname !== 'localhost' && 
+                                !window.location.hostname.includes('127.0.0.1');
             
-            // Remover barras duplas nas URLs
-            const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
-            const cleanBaseUrl = this.baseUrl.startsWith('/') ? this.baseUrl : `/${this.baseUrl}`;
-            const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-            
-            const fullPath = `${cleanBase}${cleanBaseUrl}${cleanEndpoint}`;
-            url = new URL(fullPath);
+            if (isProduction) {
+                // Em produção, usar caminhos relativos ao domínio atual
+                const base = window.location.origin;
+                url = new URL(`${base}/${endpoint}`, base);
+            } else {
+                // Em ambiente local, usar o baseUrl configurado
+                const base = window.location.origin;
+                const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
+                const cleanBaseUrl = this.baseUrl.startsWith('/') ? this.baseUrl : `/${this.baseUrl}`;
+                const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+                
+                const fullPath = `${cleanBase}${cleanBaseUrl}${cleanEndpoint}`;
+                url = new URL(fullPath);
+            }
         }
         
         // Adicionar parâmetros à URL
@@ -598,23 +606,57 @@ class ApiService {
      * @returns {Promise<string>} Caminho da imagem no servidor
      */
     async uploadImage(file) {
+        if (!file || !(file instanceof File)) {
+            console.error('Upload inválido: o arquivo não é válido', file);
+            throw new Error('Arquivo de imagem inválido');
+        }
+        
         const formData = new FormData();
         formData.append('image', file);
         
-        const url = `${this.baseUrl}/upload.php`;
+        // Determinar a URL de upload correta
+        let uploadUrl;
+        const isProduction = window.location.hostname !== 'localhost' && 
+                            !window.location.hostname.includes('127.0.0.1');
+        
+        if (isProduction) {
+            // Em produção, usar caminho relativo
+            uploadUrl = `${window.location.origin}/upload.php`;
+        } else {
+            // Em desenvolvimento, usar o caminho do servidor
+            uploadUrl = `${window.location.origin}/${this.baseUrl}/upload.php`;
+        }
+        
+        console.log(`Tentando fazer upload para: ${uploadUrl}`);
         
         try {
-            const response = await fetch(url, {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos para upload
+            
+            const response = await fetch(uploadUrl, {
                 method: 'POST',
-                body: formData
+                body: formData,
+                signal: controller.signal
             });
             
+            clearTimeout(timeoutId);
+            
             if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`Erro no upload (${response.status}): ${errorText}`);
                 throw new Error('Erro ao fazer upload da imagem');
             }
             
-            const result = await response.json();
-            return result.imagePath;
+            try {
+                const result = await response.json();
+                console.log('Upload realizado com sucesso:', result);
+                return result.imagePath;
+            } catch (jsonError) {
+                console.error('Erro ao analisar resposta JSON do upload:', jsonError);
+                const text = await response.text();
+                console.log('Resposta em texto:', text);
+                throw new Error('Erro ao processar resposta do servidor após upload');
+            }
         } catch (error) {
             console.error('Erro no upload da imagem:', error);
             throw error;

@@ -95,8 +95,8 @@ async function initCarouselData() {
                 title: slide.title || `Slide ${slide.id}`,
                 description: slide.subtitle || '',
                 link: slide.buttonLink || '',
-                imageUrl: slide.image,
-                slideId: slide.id
+                image: slide.image,
+                order: slide.order
             }));
             
             // Salva em ambos os sistemas
@@ -112,12 +112,12 @@ async function initCarouselData() {
             
             // Converte para o formato do main
             const mainSlides = adminItems.map((item, index) => ({
-                id: item.slideId || Date.now() + index,
+                id: item.id || Date.now() + index,
                 title: item.title,
                 subtitle: item.description,
                 buttonText: '',
                 buttonLink: item.link,
-                image: item.imageUrl,
+                image: item.image,
                 order: index + 1
             }));
             
@@ -131,11 +131,13 @@ async function initCarouselData() {
             
             // Converte para o formato do admin
             const adminItems = mainSlides.map(slide => ({
-                title: slide.title || `Slide ${slide.id}`,
-                description: slide.subtitle || '',
-                link: slide.buttonLink || '',
-                imageUrl: slide.image,
-                slideId: slide.id
+                id: slide.id,
+                title: slide.title,
+                subtitle: slide.subtitle,
+                buttonText: '',
+                buttonLink: slide.buttonLink,
+                image: slide.image,
+                order: slide.order
             }));
             
             localStorage.setItem('carousel', JSON.stringify(adminItems));
@@ -149,7 +151,7 @@ async function initCarouselData() {
             
             // Verifica se todos os slides do main têm correspondência no admin
             const mainIds = mainSlides.map(slide => slide.id);
-            const adminIds = adminItems.map(item => item.slideId).filter(id => id);
+            const adminIds = adminItems.map(item => item.id).filter(id => id);
             
             const needsSync = !mainIds.every(id => adminIds.includes(id)) || 
                              !adminIds.every(id => mainIds.includes(id)) ||
@@ -160,11 +162,13 @@ async function initCarouselData() {
                 
                 // Usa os dados do main como fonte da verdade
                 const syncedAdminItems = mainSlides.map(slide => ({
-                    title: slide.title || `Slide ${slide.id}`,
-                    description: slide.subtitle || '',
-                    link: slide.buttonLink || '',
-                    imageUrl: slide.image,
-                    slideId: slide.id
+                    id: slide.id,
+                    title: slide.title,
+                    subtitle: slide.subtitle,
+                    buttonText: '',
+                    buttonLink: slide.buttonLink,
+                    image: slide.image,
+                    order: slide.order
                 }));
                 
                 localStorage.setItem('carousel', JSON.stringify(syncedAdminItems));
@@ -766,35 +770,46 @@ function initProductSearch() {
 }
 
 /**
- * Abre o modal de produto
+ * Abre o modal para criar ou editar um produto
+ * @param {number} productId - ID do produto para edição (opcional)
  */
 function openProductModal(productId = null) {
     const modal = document.getElementById('product-modal');
     const form = document.getElementById('product-form');
-    const titleElement = modal.querySelector('.modal-title');
+    const titleElement = document.querySelector('#product-modal .modal-header h2');
     const imagePreview = document.getElementById('product-image-preview');
     
-    // Limpa o formulário
+    // Configura o formulário
     form.reset();
-    
-    // Configura o ID do produto
     form.dataset.productId = productId || '';
     
-    // Atualiza o select de categorias
-    const categorySelect = form.elements.categoryId;
-    categorySelect.innerHTML = '<option value="">Selecione uma categoria</option>';
+    // Limpa a visualização de imagem
+    imagePreview.src = '';
+    imagePreview.style.display = 'none';
     
+    // Carrega as categorias no select
+    const categorySelect = document.getElementById('product-category');
+    
+    // Limpa as opções atuais exceto a primeira (default)
+    while (categorySelect.options.length > 1) {
+        categorySelect.remove(1);
+    }
+    
+    // Adiciona as categorias
     const categories = categoryManager.getFlatCategories();
     categories.forEach(category => {
         const option = document.createElement('option');
         option.value = category.id;
-        option.textContent = category.path;
+        option.textContent = category.path || category.name;
         categorySelect.appendChild(option);
     });
     
+    // Se tem ID, está editando
     if (productId) {
         // Modo de edição
         titleElement.textContent = 'Editar Produto';
+        
+        // Carrega os dados do produto
         const product = productManager.getProductById(productId);
         
         if (product) {
@@ -802,7 +817,7 @@ function openProductModal(productId = null) {
             form.elements.description.value = product.description || '';
             form.elements.price.value = product.price;
             form.elements.stock.value = product.stock;
-            form.elements.categoryId.value = product.categoryId || '';
+            form.elements.category.value = product.categoryId || 'null';
             form.elements.isNew.checked = product.isNew || false;
             form.elements.sale.checked = product.sale || false;
             form.elements.salePrice.value = product.salePrice || '';
@@ -823,30 +838,45 @@ function openProductModal(productId = null) {
 }
 
 /**
- * Salva um produto
+ * Salva um produto (novo ou existente)
+ * @param {Event} e - Evento de submit do formulário
  */
-async function saveProduct(event) {
-    event.preventDefault();
-    
-    const form = event.target;
-    const productId = form.dataset.productId;
-    const formData = new FormData(form);
-    
-    // Valida os campos obrigatórios
-    const name = formData.get('name').trim();
-    const price = parseFloat(formData.get('price'));
-    const stock = parseInt(formData.get('stock'));
-    const categoryId = formData.get('categoryId');
-    
-    if (!name || isNaN(price) || isNaN(stock)) {
-        showNotification('Preencha todos os campos obrigatórios', 'error');
-        return;
-    }
+async function saveProduct(e) {
+    e.preventDefault();
     
     try {
-        // Prepara os dados do produto
+        const form = e.target;
+        const formData = new FormData(form);
+        
+        // Obtém o ID do produto (se estiver editando)
+        const productId = form.dataset.productId;
+        
+        // Valida os campos obrigatórios
+        const name = formData.get('name').trim();
+        if (!name) {
+            showNotification('Nome do produto é obrigatório', 'error');
+            return;
+        }
+        
+        // Converte valores para números
+        const price = parseFloat(formData.get('price'));
+        if (isNaN(price) || price <= 0) {
+            showNotification('Preço do produto deve ser um número positivo', 'error');
+            return;
+        }
+        
+        const stock = parseInt(formData.get('stock'));
+        if (isNaN(stock) || stock < 0) {
+            showNotification('Estoque deve ser um número não negativo', 'error');
+            return;
+        }
+        
+        // Obtém a categoria selecionada
+        const categoryId = formData.get('category') !== 'null' ? formData.get('category') : null;
+        
+        // Cria o objeto do produto
         const productData = {
-            name,
+            name: name,
             description: formData.get('description').trim(),
             price,
             stock,
@@ -858,13 +888,25 @@ async function saveProduct(event) {
         
         // Obtém a imagem
         const imageFile = form.elements.image.files[0];
+        let imagePath = null;
+        
         if (imageFile) {
             try {
-                const imagePath = await window.api.uploadImage(imageFile);
+                console.log('Iniciando upload de imagem:', imageFile.name);
+                imagePath = await window.api.uploadImage(imageFile);
+                console.log('Upload de imagem concluído com sucesso:', imagePath);
                 productData.image = imagePath;
-            } catch (error) {
-                console.error('Erro ao fazer upload de imagem:', error);
+            } catch (uploadError) {
+                console.error('Erro ao fazer upload de imagem:', uploadError);
                 showNotification('Erro ao enviar a imagem. O produto será salvo sem imagem.', 'warning');
+                
+                // Se está apenas editando e já temos uma imagem, mantém a anterior
+                if (productId) {
+                    const existingProduct = productManager.getProductById(parseInt(productId));
+                    if (existingProduct && existingProduct.image) {
+                        productData.image = existingProduct.image;
+                    }
+                }
             }
         } else if (productId) {
             // Se estamos editando e não foi enviada nova imagem, mantém a imagem atual
@@ -874,14 +916,18 @@ async function saveProduct(event) {
             }
         }
         
+        console.log('Dados do produto a salvar:', productData);
+        
         if (productId) {
             // Atualiza o ID para o produto existente
             productData.id = parseInt(productId);
             
+            console.log('Atualizando produto existente:', productData.id);
             // Atualiza produto existente via API
             await window.api.updateProduct(productData);
             showNotification('Produto atualizado com sucesso');
         } else {
+            console.log('Adicionando novo produto');
             // Adiciona novo produto via API
             await window.api.addProduct(productData);
             showNotification('Produto criado com sucesso');
@@ -898,7 +944,7 @@ async function saveProduct(event) {
         await loadProducts();
     } catch (error) {
         console.error('Erro ao salvar produto:', error);
-        showNotification('Erro ao salvar produto', 'error');
+        showNotification(`Erro ao salvar produto: ${error.message}`, 'error');
     }
 }
 
