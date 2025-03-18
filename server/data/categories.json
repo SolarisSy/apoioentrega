@@ -1,19 +1,22 @@
 [
     {
         "id": "cat1",
-        "name": "Bags e Mochilas"
+        "name": "Bags e Mochilas",
+        "parentId": null
     },
     {
         "id": "cat2",
-        "name": "Equipamentos de Prote\u00e7\u00e3o"
+        "name": "Equipamentos de Proteção",
+        "parentId": null
     },
     {
         "id": "cat3",
-        "name": "Acess\u00f3rios"
+        "name": "Acessórios",
+        "parentId": null
     },
     {
-        "name": "Solaris",
-        "parentId": null,
-        "id": "cat4"
+        "id": "cat4",
+        "name": "Peças e Componentes",
+        "parentId": null
     }
-]
+] 

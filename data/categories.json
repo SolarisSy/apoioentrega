@@ -1,14 +1,22 @@
 [
     {
         "id": "cat1",
-        "name": "Bags e Mochilas"
+        "name": "Bags e Mochilas",
+        "parentId": null
     },
     {
         "id": "cat2",
-        "name": "Equipamentos de Proteção"
+        "name": "Equipamentos de Proteção",
+        "parentId": null
     },
     {
         "id": "cat3",
-        "name": "Acessórios"
+        "name": "Acessórios",
+        "parentId": null
+    },
+    {
+        "id": "cat4",
+        "name": "Peças e Componentes",
+        "parentId": null
     }
 ] 

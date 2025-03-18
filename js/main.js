@@ -1562,16 +1562,22 @@ async function loadCarouselSlides() {
         indicatorsContainer.innerHTML = '';
         
         // Carrega os slides da API
-        let slides = [];
+        let slidesData = [];
         try {
-            slides = await window.api.getCarouselSlides();
-            console.log(`${slides.length} slides carregados da API`);
+            slidesData = await window.api.getCarouselSlides();
+            // Garante que slidesData seja um array
+            if (!Array.isArray(slidesData)) {
+                console.warn('Dados de slides recebidos não são um array, convertendo...');
+                slidesData = Array.isArray(slidesData) ? slidesData : [];
+            }
+            console.log(`${slidesData.length} slides carregados da API`);
         } catch (error) {
             console.error('Erro ao carregar slides da API:', error);
+            slidesData = [];
         }
         
         // Se não houver slides, cria slides padrão
-        if (!slides || slides.length === 0) {
+        if (!slidesData || slidesData.length === 0) {
             console.log('Nenhum slide encontrado, criando slides padrão');
             // Cria slides padrão
             const defaultSlides = [
@@ -1609,21 +1615,27 @@ async function loadCarouselSlides() {
                 for (const slide of defaultSlides) {
                     await window.api.addSlide(slide);
                 }
-                slides = await window.api.getCarouselSlides();
+                slidesData = await window.api.getCarouselSlides();
+                // Garante que slidesData seja um array
+                slidesData = Array.isArray(slidesData) ? slidesData : [];
                 console.log('Slides padrão criados e salvos via API');
             } catch (error) {
                 console.error('Erro ao salvar slides padrão:', error);
-                slides = defaultSlides; // Usa localmente em caso de erro
+                slidesData = defaultSlides; // Usa localmente em caso de erro
             }
         }
         
-        console.log(`Renderizando ${slides.length} slides`);
+        console.log(`Renderizando ${slidesData.length} slides`);
         
-        // Ordena os slides
-        slides.sort((a, b) => (a.order || 0) - (b.order || 0));
+        // Ordena os slides apenas se for um array
+        if (Array.isArray(slidesData)) {
+            slidesData.sort((a, b) => (a.order || 0) - (b.order || 0));
+        } else {
+            console.error('Slides não é um array, não é possível ordenar');
+        }
         
         // Adiciona cada slide
-        slides.forEach((slide, index) => {
+        slidesData.forEach((slide, index) => {
             // Cria o elemento do slide
             const slideElement = document.createElement('div');
             slideElement.className = `carousel-slide ${index === 0 ? 'active' : ''}`;
