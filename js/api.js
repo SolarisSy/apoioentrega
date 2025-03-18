@@ -25,76 +25,61 @@ class ApiService {
     }
     
     /**
-     * Realiza uma requisição HTTP
+     * Faz uma requisição para a API
      * @param {string} endpoint - Endpoint da API
      * @param {string} method - Método HTTP (GET, POST, PUT, DELETE)
-     * @param {Object} data - Dados a serem enviados
-     * @param {Object} params - Parâmetros de query string
-     * @returns {Promise<Object>} Resposta da API
+     * @param {Object} data - Dados para enviar
+     * @param {Object} params - Parâmetros de URL
+     * @param {Object} additionalHeaders - Headers HTTP adicionais
+     * @returns {Promise<Object>} - Resposta da API
      */
-    async request(endpoint, method = 'GET', data = null, params = {}) {
-        // Adiciona o sessionId nos parâmetros para endpoints que precisam
-        if (endpoint === 'cart.php') {
-            params.sessionId = this.sessionId;
-        }
+    async request(endpoint, method = 'GET', data = null, params = {}, additionalHeaders = {}) {
+        const apiUrl = this.baseUrl + endpoint;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.defaultTimeout);
         
-        // Constrói a URL com os parâmetros
-        let url = `${this.baseUrl}/${endpoint}`;
-        
-        if (Object.keys(params).length > 0) {
-            const queryParams = new URLSearchParams();
-            for (const key in params) {
-                queryParams.append(key, params[key]);
-            }
-            url += `?${queryParams.toString()}`;
-        }
-        
-        // Configura a requisição
-        const options = {
-            method,
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            }
-        };
-        
-        // Adiciona o corpo da requisição para métodos que aceitam dados
-        if (data && (method === 'POST' || method === 'PUT')) {
-            options.body = JSON.stringify(data);
+        // Adiciona parâmetros à URL
+        const url = new URL(apiUrl, window.location.origin);
+        if (params) {
+            Object.keys(params).forEach(key => {
+                url.searchParams.append(key, params[key]);
+            });
         }
         
         try {
-            // Cria um timeout para a requisição
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), this.defaultTimeout);
-            options.signal = controller.signal;
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0',
+                    ...additionalHeaders
+                },
+                signal: controller.signal
+            };
             
-            // Realiza a requisição
-            const response = await fetch(url, options);
+            if (data && method !== 'GET') {
+                options.body = JSON.stringify(data);
+            }
+            
+            const response = await fetch(url.toString(), options);
             clearTimeout(timeoutId);
             
-            // Verifica se a resposta é JSON
-            const contentType = response.headers.get('content-type');
+            if (!response.ok) {
+                throw new Error(`Erro na resposta: ${response.status} ${response.statusText}`);
+            }
+            
+            const contentType = response.headers.get('Content-Type');
             if (contentType && contentType.includes('application/json')) {
-                const result = await response.json();
-                
-                // Verifica se houve erro
-                if (!response.ok) {
-                    throw new Error(result.error || 'Erro na requisição');
-                }
-                
-                return result;
+                return await response.json();
             } else {
-                // Resposta não é JSON
-                if (!response.ok) {
-                    throw new Error('Erro na requisição');
-                }
-                
                 return await response.text();
             }
         } catch (error) {
+            clearTimeout(timeoutId);
             console.error(`Erro na requisição para ${endpoint}:`, error);
-            throw error;
+            throw new Error('Erro na requisição');
         }
     }
     
@@ -224,6 +209,36 @@ class ApiService {
      * @returns {Promise<Array>} Lista de categorias
      */
     async getAllCategories() {
+        try {
+            // Adiciona parâmetro de timestamp para evitar cache
+            const timestamp = Date.now();
+            const apiCategories = await this.request('categories.php', 'GET', null, { timestamp });
+            
+            if (Array.isArray(apiCategories) && apiCategories.length > 0) {
+                // Armazena no localStorage apenas para fallback, não como fonte primária
+                try {
+                    localStorage.setItem('localCategories', JSON.stringify(apiCategories));
+                    localStorage.setItem('categoriesLastUpdate', timestamp.toString());
+                } catch (e) {
+                    console.warn('Erro ao salvar categorias no localStorage:', e);
+                }
+                return apiCategories;
+            }
+            
+            // Retorna os dados de fallback apenas se não houver dados da API
+            return this.getCategoryFallbackData();
+        } catch (error) {
+            console.warn('Erro ao obter categorias da API, usando fallback:', error);
+            return this.getCategoryFallbackData();
+        }
+    }
+    
+    /**
+     * Obtém dados de categorias de fallback (localStorage ou padrão)
+     * @private
+     * @returns {Array} Categorias de fallback
+     */
+    getCategoryFallbackData() {
         const fallbackCategories = [
             {
                 id: "cat1",
@@ -248,56 +263,20 @@ class ApiService {
         ];
         
         try {
-            // Tenta obter da API
-            const apiCategories = await this.request('categories.php');
-            if (Array.isArray(apiCategories) && apiCategories.length > 0) {
-                return apiCategories;
-            }
-            
-            // Se API retornou array vazio, combina fallback com localStorage
-            let localCategories = [];
-            try {
-                localCategories = JSON.parse(localStorage.getItem('localCategories') || '[]');
-            } catch (e) {
-                console.warn('Erro ao ler categorias do localStorage:', e);
-            }
-            
-            // Combina fallback e localStorage, evitando duplicatas por ID
-            const combinedCategories = [...fallbackCategories];
-            const fallbackIds = new Set(fallbackCategories.map(cat => cat.id));
-            
-            // Adiciona categorias locais que não estão no fallback
-            localCategories.forEach(localCat => {
-                if (!fallbackIds.has(localCat.id)) {
-                    combinedCategories.push(localCat);
-                }
-            });
-            
-            return combinedCategories;
-        } catch (error) {
-            console.warn('Erro ao obter categorias da API, usando fallback:', error);
-            
-            // Tenta combinar fallback com localStorage
-            try {
+            const lastUpdate = parseInt(localStorage.getItem('categoriesLastUpdate') || '0');
+            const now = Date.now();
+            // Se os dados locais têm menos de 5 minutos, usa-os
+            if (now - lastUpdate < 300000) {
                 const localCategories = JSON.parse(localStorage.getItem('localCategories') || '[]');
-                
-                // Combina fallback e localStorage, evitando duplicatas por ID
-                const combinedCategories = [...fallbackCategories];
-                const fallbackIds = new Set(fallbackCategories.map(cat => cat.id));
-                
-                // Adiciona categorias locais que não estão no fallback
-                localCategories.forEach(localCat => {
-                    if (!fallbackIds.has(localCat.id)) {
-                        combinedCategories.push(localCat);
-                    }
-                });
-                
-                return combinedCategories;
-            } catch (storageError) {
-                console.error('Erro ao ler categorias do localStorage:', storageError);
-                return fallbackCategories;
+                if (Array.isArray(localCategories) && localCategories.length > 0) {
+                    return localCategories;
+                }
             }
+        } catch (e) {
+            console.error('Erro ao ler categorias de localStorage:', e);
         }
+        
+        return fallbackCategories;
     }
     
     /**
@@ -333,28 +312,29 @@ class ApiService {
      */
     async addCategory(category) {
         try {
-            return await this.request('categories.php', 'POST', category);
-        } catch (error) {
-            console.warn('Erro ao adicionar categoria via API, usando fallback local:', error);
-            
-            // Fallback: simula adição local quando a API falha
-            const allCategories = await this.getAllCategories();
-            const newCategory = {
-                ...category,
-                id: 'cat' + (Date.now() % 10000), // Gera um ID único
-                createdAt: new Date().toISOString()
+            // Adiciona timestamp para forçar recarregamento e evitar cache
+            const timestamp = Date.now();
+            const headers = {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
             };
             
-            // Tenta salvar no localStorage como fallback
-            try {
-                const localCategories = JSON.parse(localStorage.getItem('localCategories') || '[]');
-                localCategories.push(newCategory);
-                localStorage.setItem('localCategories', JSON.stringify(localCategories));
-            } catch (storageError) {
-                console.error('Erro ao salvar categoria no localStorage:', storageError);
-            }
+            // Modifica a função request para incluir os headers
+            const result = await this.request('categories.php', 'POST', {...category, timestamp}, {}, headers);
             
-            return newCategory;
+            // Força recarregamento de categorias após adicionar
+            setTimeout(() => {
+                // Disparar evento de atualização
+                window.dispatchEvent(new CustomEvent('categories-updated', {
+                    detail: { action: 'add', category: result }
+                }));
+            }, 100);
+            
+            return result;
+        } catch (error) {
+            console.warn('Erro ao adicionar categoria:', error);
+            throw error;
         }
     }
     
@@ -365,34 +345,28 @@ class ApiService {
      */
     async updateCategory(category) {
         try {
-            return await this.request('categories.php', 'PUT', category);
+            // Adiciona timestamp para forçar recarregamento e evitar cache
+            const timestamp = Date.now();
+            const headers = {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            };
+            
+            const result = await this.request('categories.php', 'PUT', {...category, timestamp}, {}, headers);
+            
+            // Força recarregamento de categorias após atualizar
+            setTimeout(() => {
+                // Disparar evento de atualização
+                window.dispatchEvent(new CustomEvent('categories-updated', {
+                    detail: { action: 'update', category: result }
+                }));
+            }, 100);
+            
+            return result;
         } catch (error) {
-            console.warn('Erro ao atualizar categoria via API, usando fallback local:', error);
-            
-            // Fallback: simula atualização local quando a API falha
-            try {
-                let localCategories = JSON.parse(localStorage.getItem('localCategories') || '[]');
-                const index = localCategories.findIndex(cat => cat.id === category.id);
-                
-                if (index !== -1) {
-                    localCategories[index] = {
-                        ...localCategories[index],
-                        ...category,
-                        updatedAt: new Date().toISOString()
-                    };
-                } else {
-                    // Se não encontrou, talvez seja uma categoria do fallback inicial
-                    // Adiciona como nova
-                    category.updatedAt = new Date().toISOString();
-                    localCategories.push(category);
-                }
-                
-                localStorage.setItem('localCategories', JSON.stringify(localCategories));
-            } catch (storageError) {
-                console.error('Erro ao atualizar categoria no localStorage:', storageError);
-            }
-            
-            return category;
+            console.warn('Erro ao atualizar categoria:', error);
+            throw error;
         }
     }
     
@@ -404,7 +378,10 @@ class ApiService {
      * @returns {Promise<Object>} Resposta da API
      */
     async deleteCategory(id, updateSubcategories = false, newParentId = null) {
-        const params = { id };
+        const params = { 
+            id, 
+            timestamp: Date.now(), // Adiciona timestamp para forçar recarregamento e evitar cache
+        };
         
         if (updateSubcategories) {
             params.updateSubcategories = 'true';
@@ -414,37 +391,26 @@ class ApiService {
         }
         
         try {
-            return await this.request('categories.php', 'DELETE', null, params);
+            const headers = {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            };
+            
+            const result = await this.request('categories.php', 'DELETE', null, params, headers);
+            
+            // Força recarregamento de categorias após deletar
+            setTimeout(() => {
+                // Disparar evento de atualização
+                window.dispatchEvent(new CustomEvent('categories-updated', {
+                    detail: { action: 'delete', categoryId: id }
+                }));
+            }, 100);
+            
+            return result;
         } catch (error) {
-            console.warn('Erro ao excluir categoria via API, usando fallback local:', error);
-            
-            // Fallback: simula exclusão local quando a API falha
-            try {
-                let localCategories = JSON.parse(localStorage.getItem('localCategories') || '[]');
-                
-                // Remove a categoria
-                localCategories = localCategories.filter(cat => cat.id !== id);
-                
-                // Se precisar atualizar subcategorias
-                if (updateSubcategories) {
-                    localCategories = localCategories.map(cat => {
-                        if (cat.parentId === id) {
-                            return {
-                                ...cat,
-                                parentId: newParentId,
-                                updatedAt: new Date().toISOString()
-                            };
-                        }
-                        return cat;
-                    });
-                }
-                
-                localStorage.setItem('localCategories', JSON.stringify(localCategories));
-            } catch (storageError) {
-                console.error('Erro ao excluir categoria no localStorage:', storageError);
-            }
-            
-            return { success: true, message: 'Categoria excluída localmente' };
+            console.warn('Erro ao excluir categoria:', error);
+            throw error;
         }
     }
     

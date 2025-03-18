@@ -1386,4 +1386,381 @@ async function initOrdersSection() {
     console.log("Seção de pedidos inicializada");
     const mainContent = document.getElementById('main-content');
     mainContent.innerHTML = '<div class="section-message">Funcionalidade de pedidos em desenvolvimento.</div>';
+}
+
+/**
+ * Inicializa o painel de administração
+ */
+document.addEventListener('DOMContentLoaded', async () => {
+    // Inicializa os gerenciadores
+    window.categoryManager = new CategoryManager();
+    window.api = new ApiService();
+    
+    // Carrega as categorias iniciais
+    await window.categoryManager.loadCategories();
+    
+    // Configura listeners de eventos
+    setupCategoryListeners();
+    setupCarouselListeners();
+    
+    // Adiciona listener para eventos de atualização
+    window.addEventListener('categories-refreshed', () => {
+        refreshCategoryUI();
+    });
+    
+    // Inicializa a interface
+    showCategoriesTab();
+});
+
+/**
+ * Adiciona uma nova categoria
+ */
+async function addCategory() {
+    // Obtém os valores do formulário
+    const categoryName = document.getElementById('newCategoryName').value.trim();
+    const parentSelect = document.getElementById('newCategoryParent');
+    const parentId = parentSelect.value !== "null" ? parentSelect.value : null;
+    
+    // Verifica se o nome foi fornecido
+    if (!categoryName) {
+        showMessage('Erro ao adicionar categoria', 'Por favor, forneça um nome para a categoria', 'error');
+        return;
+    }
+    
+    try {
+        // Adiciona a categoria
+        const newCategory = await window.categoryManager.addCategory(categoryName, parentId);
+        
+        // Limpa o formulário
+        document.getElementById('newCategoryName').value = '';
+        parentSelect.value = "null";
+        
+        showMessage('Sucesso', 'Categoria adicionada com sucesso', 'success');
+    } catch (error) {
+        console.error('Erro ao adicionar categoria:', error);
+        showMessage('Erro ao adicionar categoria', error.message, 'error');
+    }
+}
+
+/**
+ * Atualiza uma categoria existente
+ */
+async function updateCategory() {
+    // Obtém os valores do formulário
+    const categoryId = document.getElementById('editCategoryId').value;
+    const categoryName = document.getElementById('editCategoryName').value.trim();
+    const parentSelect = document.getElementById('editCategoryParent');
+    const parentId = parentSelect.value !== "null" ? parentSelect.value : null;
+    
+    // Verifica se os dados foram fornecidos
+    if (!categoryId || !categoryName) {
+        showMessage('Erro ao atualizar categoria', 'ID ou nome da categoria não fornecido', 'error');
+        return;
+    }
+    
+    try {
+        // Atualiza a categoria
+        await window.categoryManager.updateCategory(categoryId, categoryName, parentId);
+        
+        // Fecha o modal
+        bootstrap.Modal.getInstance(document.getElementById('editCategoryModal')).hide();
+        
+        showMessage('Sucesso', 'Categoria atualizada com sucesso', 'success');
+    } catch (error) {
+        console.error('Erro ao atualizar categoria:', error);
+        showMessage('Erro ao atualizar categoria', error.message, 'error');
+    }
+}
+
+/**
+ * Remove uma categoria
+ */
+async function deleteCategory() {
+    // Obtém o ID da categoria
+    const categoryId = document.getElementById('deleteCategoryId').value;
+    const updateSubcategories = document.getElementById('updateSubcategories').checked;
+    const parentSelect = document.getElementById('newParentCategory');
+    const newParentId = updateSubcategories && parentSelect.value !== "null" ? parentSelect.value : null;
+    
+    // Verifica se o ID foi fornecido
+    if (!categoryId) {
+        showMessage('Erro ao excluir categoria', 'ID da categoria não fornecido', 'error');
+        return;
+    }
+    
+    try {
+        // Remove a categoria
+        await window.categoryManager.deleteCategory(categoryId, updateSubcategories, newParentId);
+        
+        // Fecha o modal
+        bootstrap.Modal.getInstance(document.getElementById('deleteCategoryModal')).hide();
+        
+        showMessage('Sucesso', 'Categoria excluída com sucesso', 'success');
+    } catch (error) {
+        console.error('Erro ao excluir categoria:', error);
+        showMessage('Erro ao excluir categoria', error.message, 'error');
+    }
+}
+
+/**
+ * Renderiza a tabela de categorias
+ */
+function renderCategoryTable() {
+    const categoryTableBody = document.getElementById('categoryTableBody');
+    if (!categoryTableBody) return;
+    
+    // Limpa a tabela
+    categoryTableBody.innerHTML = '';
+    
+    if (!window.categoryManager || !Array.isArray(window.categoryManager.categories)) {
+        console.warn('Nenhuma categoria disponível para renderizar');
+        return;
+    }
+    
+    // Obtém as categorias organizadas
+    const categories = window.categoryManager.getFlatCategories();
+    
+    // Renderiza cada categoria
+    categories.forEach(category => {
+        const tr = document.createElement('tr');
+        
+        // Cria o nome com recuo para indicar hierarquia
+        const nameCell = document.createElement('td');
+        const namePrefix = category.level > 0 ? '&nbsp;'.repeat(category.level * 4) + '└─ ' : '';
+        nameCell.innerHTML = namePrefix + category.name;
+        
+        // Cria as ações
+        const actionsCell = document.createElement('td');
+        actionsCell.className = 'text-end';
+        
+        // Botão de editar
+        const editButton = document.createElement('button');
+        editButton.className = 'btn btn-sm btn-primary me-1';
+        editButton.innerHTML = '<i class="bi bi-pencil"></i>';
+        editButton.onclick = () => openEditCategoryModal(category.id);
+        
+        // Botão de excluir
+        const deleteButton = document.createElement('button');
+        deleteButton.className = 'btn btn-sm btn-danger';
+        deleteButton.innerHTML = '<i class="bi bi-trash"></i>';
+        deleteButton.onclick = () => openDeleteCategoryModal(category.id);
+        
+        // Adiciona os botões à célula de ações
+        actionsCell.appendChild(editButton);
+        actionsCell.appendChild(deleteButton);
+        
+        // Adiciona as células à linha
+        tr.appendChild(nameCell);
+        tr.appendChild(actionsCell);
+        
+        // Adiciona a linha à tabela
+        categoryTableBody.appendChild(tr);
+    });
+}
+
+/**
+ * Atualiza todos os selects de categorias
+ */
+function updateCategorySelects() {
+    // Atualiza os selects de categorias
+    const selects = document.querySelectorAll('.category-select');
+    
+    if (!window.categoryManager || !Array.isArray(window.categoryManager.categories)) {
+        console.warn('Nenhuma categoria disponível para os selects');
+        return;
+    }
+    
+    // Obtém as categorias organizadas para os selects
+    const categories = window.categoryManager.getFlatCategories();
+    
+    // Atualiza cada select
+    selects.forEach(select => {
+        // Guarda o valor selecionado atual
+        const currentValue = select.value;
+        const excludeId = select.dataset.excludeId;
+        
+        // Limpa o select
+        select.innerHTML = '';
+        
+        // Adiciona a opção "Nenhuma" (para categorias principais)
+        const noneOption = document.createElement('option');
+        noneOption.value = "null";
+        noneOption.textContent = "Nenhuma (Categoria Principal)";
+        select.appendChild(noneOption);
+        
+        // Adiciona as opções de categorias
+        categories.forEach(category => {
+            // Pula a categoria atual ao editar (para evitar categoria pai ser ela mesma)
+            if (excludeId && category.id === excludeId) return;
+            
+            const option = document.createElement('option');
+            option.value = category.id;
+            
+            // Adiciona recuo para indicar hierarquia
+            const prefix = category.level > 0 ? '└─ '.repeat(category.level) : '';
+            option.textContent = prefix + category.name;
+            
+            // Se for nova categoria pai no modal de exclusão, marca como selecionada
+            if (select.id === 'newParentCategory' && currentValue === category.id) {
+                option.selected = true;
+            }
+            
+            select.appendChild(option);
+        });
+        
+        // Restaura o valor selecionado se possível
+        if (currentValue && currentValue !== "null") {
+            // Verifica se a opção ainda existe
+            const optionExists = Array.from(select.options).some(opt => opt.value === currentValue);
+            if (optionExists) {
+                select.value = currentValue;
+            }
+        }
+    });
+}
+
+/**
+ * Abre o modal de edição de categoria
+ * @param {string} categoryId - ID da categoria
+ */
+function openEditCategoryModal(categoryId) {
+    if (!window.categoryManager) return;
+    
+    // Obtém a categoria
+    const category = window.categoryManager.getCategoryById(categoryId);
+    if (!category) {
+        console.error(`Categoria com ID ${categoryId} não encontrada`);
+        return;
+    }
+    
+    // Preenche o formulário
+    document.getElementById('editCategoryId').value = category.id;
+    document.getElementById('editCategoryName').value = category.name;
+    
+    const parentSelect = document.getElementById('editCategoryParent');
+    parentSelect.value = category.parentId || "null";
+    parentSelect.dataset.excludeId = category.id; // Evita categoria pai ser ela mesma
+    
+    // Atualiza o select de categorias pais
+    updateCategorySelects();
+    
+    // Abre o modal
+    const modal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
+    modal.show();
+}
+
+/**
+ * Abre o modal de exclusão de categoria
+ * @param {string} categoryId - ID da categoria
+ */
+function openDeleteCategoryModal(categoryId) {
+    if (!window.categoryManager) return;
+    
+    // Obtém a categoria
+    const category = window.categoryManager.getCategoryById(categoryId);
+    if (!category) {
+        console.error(`Categoria com ID ${categoryId} não encontrada`);
+        return;
+    }
+    
+    // Verifica se tem subcategorias
+    const hasSubcategories = window.categoryManager.hasSubcategories(categoryId);
+    
+    // Preenche o formulário
+    document.getElementById('deleteCategoryId').value = category.id;
+    document.getElementById('deleteCategoryName').textContent = category.name;
+    
+    // Configura a seção de subcategorias
+    const subcategoriesSection = document.getElementById('subcategoriesSection');
+    subcategoriesSection.style.display = hasSubcategories ? 'block' : 'none';
+    
+    // Atualiza o select de novas categorias pais
+    updateCategorySelects();
+    
+    // Abre o modal
+    const modal = new bootstrap.Modal(document.getElementById('deleteCategoryModal'));
+    modal.show();
+}
+
+/**
+ * Configura os listeners de eventos para a seção de categorias
+ */
+function setupCategoryListeners() {
+    // Formulário de adicionar categoria
+    const addCategoryForm = document.getElementById('addCategoryForm');
+    if (addCategoryForm) {
+        addCategoryForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            addCategory();
+        });
+    }
+    
+    // Formulário de editar categoria
+    const editCategoryForm = document.getElementById('editCategoryForm');
+    if (editCategoryForm) {
+        editCategoryForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            updateCategory();
+        });
+    }
+    
+    // Formulário de excluir categoria
+    const deleteCategoryForm = document.getElementById('deleteCategoryForm');
+    if (deleteCategoryForm) {
+        deleteCategoryForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            deleteCategory();
+        });
+    }
+    
+    // Checkbox para atualizar subcategorias
+    const updateSubcategoriesCheckbox = document.getElementById('updateSubcategories');
+    if (updateSubcategoriesCheckbox) {
+        updateSubcategoriesCheckbox.addEventListener('change', function() {
+            const newParentSection = document.getElementById('newParentSection');
+            newParentSection.style.display = this.checked ? 'block' : 'none';
+        });
+    }
+}
+
+/**
+ * Configura os listeners de eventos para o carrossel
+ */
+function setupCarouselListeners() {
+    // Deixar para próxima fase
+}
+
+/**
+ * Mostra uma mensagem para o usuário
+ * @param {string} title - Título da mensagem
+ * @param {string} message - Texto da mensagem
+ * @param {string} type - Tipo de mensagem (success, error, info)
+ */
+function showMessage(title, message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-white bg-${type === 'error' ? 'danger' : type} border-0`;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+    
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                <strong>${title}</strong>: ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
+        </div>
+    `;
+    
+    const toastContainer = document.getElementById('toastContainer');
+    if (toastContainer) {
+        toastContainer.appendChild(toast);
+        const bsToast = new bootstrap.Toast(toast, { autohide: true, delay: 5000 });
+        bsToast.show();
+        
+        // Remove o toast do DOM quando for fechado
+        toast.addEventListener('hidden.bs.toast', function() {
+            toastContainer.removeChild(toast);
+        });
+    }
 } 

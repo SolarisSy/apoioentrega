@@ -1,218 +1,215 @@
 <?php
 require_once 'config.php';
 
-// Obter o método da requisição
-$method = getRequestMethod();
+// Configuração de cabeçalhos para evitar cache
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Pragma: no-cache');
+header('Expires: 0');
+header('Content-Type: application/json');
 
-// Manipular a requisição de acordo com o método
-switch ($method) {
-    case 'GET':
-        // Se tiver um ID específico, retorna apenas uma categoria
+$categoriesFile = __DIR__ . '/data/categories.json';
+
+// Método HTTP
+$method = $_SERVER['REQUEST_METHOD'];
+
+try {
+    // Verifica se o arquivo existe, caso não exista cria com um array vazio
+    if (!file_exists($categoriesFile)) {
+        file_put_contents($categoriesFile, json_encode([]));
+    }
+    
+    // Lê as categorias
+    $categories = readJsonFile($categoriesFile);
+    if (!is_array($categories)) {
+        $categories = [];
+    }
+    
+    // GET - Obtém categorias
+    if ($method === 'GET') {
+        // Se o ID for fornecido, retorna uma categoria específica
         if (isset($_GET['id'])) {
-            $id = $_GET['id'];
-            $categories = readJsonFile('categories.json');
-            
-            // Encontra a categoria pelo ID
+            $categoryId = $_GET['id'];
             $category = null;
-            foreach ($categories as $c) {
-                if ($c['id'] == $id) {
-                    $category = $c;
+            
+            foreach ($categories as $cat) {
+                if ($cat['id'] === $categoryId) {
+                    $category = $cat;
                     break;
                 }
             }
             
             if ($category) {
-                jsonResponse($category);
+                echo json_encode($category);
             } else {
-                errorResponse("Categoria não encontrada", 404);
+                http_response_code(404);
+                echo json_encode(['error' => 'Categoria não encontrada']);
             }
-        } 
-        // Se tiver um parentId, retorna subcategorias
+        }
+        // Se mainCategories for true, retorna apenas categorias principais
+        else if (isset($_GET['mainCategories']) && $_GET['mainCategories'] === 'true') {
+            $mainCategories = array_filter($categories, function($cat) {
+                return $cat['parentId'] === null;
+            });
+            echo json_encode(array_values($mainCategories));
+        }
+        // Se parentId for fornecido, retorna subcategorias
         else if (isset($_GET['parent'])) {
             $parentId = $_GET['parent'];
-            $categories = readJsonFile('categories.json');
-            
-            // Filtra as categorias pelo parentId
-            $filteredCategories = array_filter($categories, function($c) use ($parentId) {
-                return isset($c['parentId']) && $c['parentId'] == $parentId;
+            $subcategories = array_filter($categories, function($cat) use ($parentId) {
+                return $cat['parentId'] === $parentId;
             });
-            
-            jsonResponse(array_values($filteredCategories));
-        }
-        // Se tiver mainCategories=true, retorna apenas categorias principais
-        else if (isset($_GET['mainCategories']) && $_GET['mainCategories'] == 'true') {
-            $categories = readJsonFile('categories.json');
-            
-            // Filtra apenas categorias principais (parentId = null)
-            $mainCategories = array_filter($categories, function($c) {
-                return !isset($c['parentId']) || $c['parentId'] === null;
-            });
-            
-            jsonResponse(array_values($mainCategories));
+            echo json_encode(array_values($subcategories));
         }
         // Caso contrário, retorna todas as categorias
         else {
-            $categories = readJsonFile('categories.json');
-            jsonResponse($categories);
+            echo json_encode($categories);
         }
-        break;
+    }
     
-    case 'POST':
-        // Adiciona uma nova categoria
-        $data = getRequestData();
+    // POST - Adiciona uma nova categoria
+    else if ($method === 'POST') {
+        // Obtém os dados da requisição
+        $data = json_decode(file_get_contents('php://input'), true);
         
-        // Valida os dados necessários
-        if (!isset($data['name'])) {
-            errorResponse("Nome da categoria não fornecido");
+        // Valida os dados
+        if (!isset($data['name']) || empty(trim($data['name']))) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Nome da categoria é obrigatório']);
+            exit;
         }
         
-        $categories = readJsonFile('categories.json');
-        
-        // Gera um novo ID se não for fornecido
-        if (!isset($data['id'])) {
-            // Verifica se as categorias usam o formato "catX" ou números
-            $usesCatPrefix = false;
-            foreach ($categories as $c) {
-                if (is_string($c['id']) && strpos($c['id'], 'cat') === 0) {
-                    $usesCatPrefix = true;
-                    break;
-                }
-            }
-            
-            if ($usesCatPrefix) {
-                $maxId = 0;
-                foreach ($categories as $c) {
-                    $id = intval(str_replace('cat', '', $c['id']));
-                    if ($id > $maxId) {
-                        $maxId = $id;
-                    }
-                }
-                $data['id'] = 'cat' . ($maxId + 1);
-            } else {
-                $maxId = 0;
-                foreach ($categories as $c) {
-                    if (is_numeric($c['id']) && $c['id'] > $maxId) {
-                        $maxId = $c['id'];
-                    }
-                }
-                $data['id'] = $maxId + 1;
-            }
-        }
-        
-        // Define parentId como null se não for fornecido
-        if (!isset($data['parentId'])) {
-            $data['parentId'] = null;
-        }
+        // Cria a nova categoria
+        $newCategory = [
+            'id' => 'cat' . uniqid(),
+            'name' => trim($data['name']),
+            'parentId' => isset($data['parentId']) ? $data['parentId'] : null,
+            'createdAt' => date('Y-m-d H:i:s')
+        ];
         
         // Adiciona a categoria
-        $categories[] = $data;
+        $categories[] = $newCategory;
         
-        // Salva o arquivo
-        if (saveJsonFile('categories.json', $categories)) {
-            jsonResponse($data, 201);
-        } else {
-            errorResponse("Erro ao salvar a categoria", 500);
-        }
-        break;
+        // Salva as categorias
+        saveJsonFile($categoriesFile, $categories);
+        
+        // Define cabeçalhos para evitar cache
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        
+        // Retorna a categoria criada
+        echo json_encode($newCategory);
+    }
     
-    case 'PUT':
-        // Atualiza uma categoria existente
-        $data = getRequestData();
+    // PUT - Atualiza uma categoria existente
+    else if ($method === 'PUT') {
+        // Obtém os dados da requisição
+        $data = json_decode(file_get_contents('php://input'), true);
         
-        // Verifica se o ID foi fornecido
-        if (!isset($data['id'])) {
-            errorResponse("ID da categoria não fornecido");
+        // Valida os dados
+        if (!isset($data['id']) || !isset($data['name']) || empty(trim($data['name']))) {
+            http_response_code(400);
+            echo json_encode(['error' => 'ID e nome da categoria são obrigatórios']);
+            exit;
         }
         
-        $categories = readJsonFile('categories.json');
-        $found = false;
+        // Procura a categoria
+        $categoryId = $data['id'];
+        $categoryFound = false;
         
-        // Atualiza a categoria
-        foreach ($categories as &$c) {
-            if ($c['id'] == $data['id']) {
-                $c = array_merge($c, $data);
-                $found = true;
+        foreach ($categories as $key => $category) {
+            if ($category['id'] === $categoryId) {
+                // Atualiza a categoria
+                $categories[$key]['name'] = trim($data['name']);
+                $categories[$key]['parentId'] = isset($data['parentId']) ? $data['parentId'] : null;
+                $categories[$key]['updatedAt'] = date('Y-m-d H:i:s');
+                $updatedCategory = $categories[$key];
+                $categoryFound = true;
                 break;
             }
         }
         
-        if (!$found) {
-            errorResponse("Categoria não encontrada", 404);
+        if (!$categoryFound) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Categoria não encontrada']);
+            exit;
         }
         
-        // Salva o arquivo
-        if (saveJsonFile('categories.json', $categories)) {
-            jsonResponse($data);
-        } else {
-            errorResponse("Erro ao atualizar a categoria", 500);
-        }
-        break;
+        // Salva as categorias
+        saveJsonFile($categoriesFile, $categories);
+        
+        // Define cabeçalhos para evitar cache
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        
+        // Retorna a categoria atualizada
+        echo json_encode($updatedCategory);
+    }
     
-    case 'DELETE':
-        // Remove uma categoria
-        if (!isset($_GET['id'])) {
-            errorResponse("ID da categoria não fornecido");
+    // DELETE - Remove uma categoria
+    else if ($method === 'DELETE') {
+        // Obtém o ID da categoria
+        $categoryId = $_GET['id'] ?? null;
+        
+        if (!$categoryId) {
+            http_response_code(400);
+            echo json_encode(['error' => 'ID da categoria é obrigatório']);
+            exit;
         }
         
-        $id = $_GET['id'];
-        $categories = readJsonFile('categories.json');
-        $found = false;
+        // Procura a categoria
+        $categoryFound = false;
+        $categoryIndex = -1;
         
-        // Filtra a categoria a ser removida
-        $newCategories = array_filter($categories, function($c) use ($id, &$found) {
-            if ($c['id'] == $id) {
-                $found = true;
-                return false;
+        foreach ($categories as $key => $category) {
+            if ($category['id'] === $categoryId) {
+                $categoryFound = true;
+                $categoryIndex = $key;
+                break;
             }
-            return true;
-        });
-        
-        if (!$found) {
-            errorResponse("Categoria não encontrada", 404);
         }
         
-        // Verifica se há produtos usando esta categoria
-        $products = readJsonFile('products.json');
-        $productsWithCategory = array_filter($products, function($p) use ($id) {
-            return $p['categoryId'] == $id;
-        });
+        if (!$categoryFound) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Categoria não encontrada']);
+            exit;
+        }
         
-        if (count($productsWithCategory) > 0) {
-            // Atualiza os produtos para remover a referência à categoria
-            foreach ($products as &$p) {
-                if ($p['categoryId'] == $id) {
-                    $p['categoryId'] = null;
-                }
-            }
+        // Remove a categoria
+        array_splice($categories, $categoryIndex, 1);
+        
+        // Atualiza subcategorias se necessário
+        if (isset($_GET['updateSubcategories']) && $_GET['updateSubcategories'] === 'true') {
+            $newParentId = $_GET['newParentId'] ?? null;
             
-            // Salva os produtos atualizados
-            saveJsonFile('products.json', $products);
-        }
-        
-        // Atualiza as subcategorias para apontar para null ou para a categoria pai
-        if (isset($_GET['updateSubcategories']) && $_GET['updateSubcategories'] == 'true') {
-            foreach ($categories as &$c) {
-                if (isset($c['parentId']) && $c['parentId'] == $id) {
-                    // Se tiver uma categoria pai para transferir
-                    if (isset($_GET['newParentId'])) {
-                        $c['parentId'] = $_GET['newParentId'];
-                    } else {
-                        $c['parentId'] = null;
-                    }
+            foreach ($categories as $key => $category) {
+                if ($category['parentId'] === $categoryId) {
+                    $categories[$key]['parentId'] = $newParentId;
+                    $categories[$key]['updatedAt'] = date('Y-m-d H:i:s');
                 }
             }
         }
         
-        // Salva o arquivo
-        if (saveJsonFile('categories.json', array_values($newCategories))) {
-            jsonResponse(['message' => 'Categoria removida com sucesso']);
-        } else {
-            errorResponse("Erro ao remover a categoria", 500);
-        }
-        break;
+        // Salva as categorias
+        saveJsonFile($categoriesFile, $categories);
+        
+        // Define cabeçalhos para evitar cache
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        
+        // Retorna sucesso
+        echo json_encode(['success' => true, 'message' => 'Categoria excluída com sucesso']);
+    }
     
-    default:
-        errorResponse("Método não suportado", 405);
-        break;
+    // Outros métodos
+    else {
+        http_response_code(405);
+        echo json_encode(['error' => 'Método não permitido']);
+    }
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Erro interno do servidor: ' . $e->getMessage()]);
 }
 ?> 

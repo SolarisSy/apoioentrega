@@ -11,82 +11,106 @@ if (typeof window.api === 'undefined' && typeof ApiService !== 'undefined') {
 class CategoryManager {
     constructor() {
         this.categories = [];
-        this.loadCategories();
+        this.api = new ApiService();
+        
+        // Adicionar listeners para eventos de atualização de categorias
+        window.addEventListener('categories-updated', this.handleCategoriesUpdated.bind(this));
     }
-
+    
+    /**
+     * Manipula evento de atualização de categorias
+     * @param {CustomEvent} event - Evento com detalhes da atualização
+     */
+    handleCategoriesUpdated(event) {
+        const { action, category, categoryId } = event.detail;
+        
+        // Recarrega as categorias após qualquer alteração
+        this.loadCategories().then(() => {
+            // Após recarregar, dispara evento para componentes atualizarem UI
+            const refreshEvent = new CustomEvent('categories-refreshed', {
+                detail: { action, category, categoryId }
+            });
+            window.dispatchEvent(refreshEvent);
+        });
+    }
+    
     /**
      * Carrega as categorias da API
+     * @returns {Promise<Array>} Lista de categorias
      */
     async loadCategories() {
         try {
-            // Carrega as categorias da API
-            const categoriesData = await window.api.getAllCategories();
+            const categories = await this.api.getAllCategories();
             
-            // Garante que this.categories seja sempre um array
-            this.categories = Array.isArray(categoriesData) ? categoriesData : [];
-            
-            // Se não obteve categorias, tenta inicializar com categorias padrão
-            if (this.categories.length === 0) {
-                console.warn('Nenhuma categoria recebida da API, inicializando categorias padrão');
-                this.initDefaultCategories();
+            if (Array.isArray(categories)) {
+                this.categories = categories;
+                return this.categories;
             } else {
-                console.log('Categorias carregadas da API:', this.categories.length);
-            }
-            
-            // Sincroniza com localStorage para persistência local 
-            // (útil para quando o servidor estiver offline)
-            try {
-                localStorage.setItem('localCategories', JSON.stringify(this.categories));
-            } catch (storageError) {
-                console.error('Erro ao salvar categorias no localStorage:', storageError);
+                this.categories = [];
+                console.error('Categorias recebidas da API não são um array válido:', categories);
+                return [];
             }
         } catch (error) {
-            console.error('Erro ao carregar categorias da API:', error);
-            
-            // Tenta ler categorias do localStorage primeiro
-            try {
-                const localCategories = JSON.parse(localStorage.getItem('localCategories') || '[]');
-                if (localCategories.length > 0) {
-                    console.log('Carregando categorias do localStorage:', localCategories.length);
-                    this.categories = localCategories;
-                    return;
-                }
-            } catch (localError) {
-                console.error('Erro ao ler categorias do localStorage:', localError);
-            }
-            
-            // Se não tiver no localStorage, inicializa categorias padrão
-            this.initDefaultCategories();
+            console.error('Erro ao carregar categorias:', error);
+            this.categories = [];
+            return [];
         }
     }
-
+    
     /**
-     * Inicializa categorias padrão
+     * Adiciona uma nova categoria
+     * @param {string} name - Nome da categoria
+     * @param {string|null} parentId - ID da categoria pai
+     * @returns {Promise<Object>} Categoria adicionada
      */
-    initDefaultCategories() {
-        this.categories = [
-            {
-                id: 'cat1',
-                name: 'Bags e Mochilas',
-                parentId: null
-            },
-            {
-                id: 'cat2',
-                name: 'Equipamentos de Proteção',
-                parentId: null
-            },
-            {
-                id: 'cat3',
-                name: 'Acessórios',
-                parentId: null
-            },
-            {
-                id: 'cat4',
-                name: 'Peças e Componentes',
-                parentId: null
-            }
-        ];
-        console.log('Categorias padrão inicializadas:', this.categories.length);
+    async addCategory(name, parentId = null) {
+        try {
+            const newCategory = await this.api.addCategory({ name, parentId });
+            
+            // A atualização automática será feita pelo evento 'categories-updated'
+            return newCategory;
+        } catch (error) {
+            console.error('Erro ao adicionar categoria:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Atualiza uma categoria existente
+     * @param {string} id - ID da categoria
+     * @param {string} name - Novo nome da categoria
+     * @param {string|null} parentId - Novo ID da categoria pai
+     * @returns {Promise<Object>} Categoria atualizada
+     */
+    async updateCategory(id, name, parentId = null) {
+        try {
+            const updatedCategory = await this.api.updateCategory({ id, name, parentId });
+            
+            // A atualização automática será feita pelo evento 'categories-updated'
+            return updatedCategory;
+        } catch (error) {
+            console.error('Erro ao atualizar categoria:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Remove uma categoria
+     * @param {string} id - ID da categoria
+     * @param {boolean} updateSubcategories - Se deve atualizar subcategorias
+     * @param {string|null} newParentId - Novo ID de categoria pai para subcategorias
+     * @returns {Promise<Object>} Resposta da API
+     */
+    async deleteCategory(id, updateSubcategories = false, newParentId = null) {
+        try {
+            const result = await this.api.deleteCategory(id, updateSubcategories, newParentId);
+            
+            // A atualização automática será feita pelo evento 'categories-updated'
+            return result;
+        } catch (error) {
+            console.error('Erro ao excluir categoria:', error);
+            throw error;
+        }
     }
 
     /**
@@ -198,181 +222,6 @@ class CategoryManager {
         
         // Para outros formatos de ID
         return this.categories.some(cat => cat.parentId === categoryId);
-    }
-
-    /**
-     * Adiciona uma nova categoria
-     * @param {string} name - Nome da categoria
-     * @param {string|number|null} parentId - ID da categoria pai (opcional)
-     * @returns {Promise<Object>} Categoria adicionada
-     */
-    async addCategory(name, parentId = null) {
-        if (!name) {
-            console.error('Nome da categoria não fornecido');
-            return null;
-        }
-        
-        try {
-            // Cria a nova categoria
-            const newCategory = {
-                name,
-                parentId
-            };
-            
-            // Adiciona a categoria via API
-            const addedCategory = await window.api.addCategory(newCategory);
-            
-            // Atualiza a lista local
-            await this.loadCategories();
-            
-            return addedCategory;
-        } catch (error) {
-            console.error('Erro ao adicionar categoria:', error);
-            
-            // Se falhou, tenta obter a categoria que foi adicionada pelo fallback local
-            try {
-                const localCategories = JSON.parse(localStorage.getItem('localCategories') || '[]');
-                const recentlyAdded = localCategories.find(cat => 
-                    cat.name === name && 
-                    cat.parentId === parentId &&
-                    cat.createdAt && // Categorias criadas pelo fallback terão este campo
-                    new Date(cat.createdAt) > new Date(Date.now() - 60000) // Criadas no último minuto
-                );
-                
-                if (recentlyAdded) {
-                    // Atualiza a lista local
-                    await this.loadCategories();
-                    return recentlyAdded;
-                }
-            } catch (localError) {
-                console.error('Erro ao verificar categoria adicionada localmente:', localError);
-            }
-            
-            throw error;
-        }
-    }
-
-    /**
-     * Atualiza uma categoria existente
-     * @param {string|number} id - ID da categoria
-     * @param {string} name - Novo nome da categoria
-     * @returns {Promise<Object>} Categoria atualizada
-     */
-    async updateCategory(id, name) {
-        if (!id || !name) {
-            console.error('ID ou nome da categoria não fornecido');
-            return null;
-        }
-        
-        try {
-            // Obtém a categoria existente
-            const category = this.getCategoryById(id);
-            if (!category) {
-                console.error(`Categoria com ID ${id} não encontrada`);
-                return null;
-            }
-            
-            // Atualiza o nome
-            category.name = name;
-            
-            // Atualiza a categoria via API
-            const updatedCategory = await window.api.updateCategory(category);
-            
-            // Atualiza a lista local
-            await this.loadCategories();
-            
-            return updatedCategory;
-        } catch (error) {
-            console.error('Erro ao atualizar categoria:', error);
-            
-            // Tenta atualizar na lista local
-            try {
-                if (this.categories) {
-                    const index = this.categories.findIndex(cat => cat.id === id);
-                    if (index !== -1) {
-                        this.categories[index].name = name;
-                        this.categories[index].updatedAt = new Date().toISOString();
-                        
-                        // Atualiza localStorage
-                        localStorage.setItem('localCategories', JSON.stringify(this.categories));
-                        
-                        return this.categories[index];
-                    }
-                }
-            } catch (localError) {
-                console.error('Erro ao atualizar categoria localmente:', localError);
-            }
-            
-            throw error;
-        }
-    }
-
-    /**
-     * Remove uma categoria
-     * @param {string|number} id - ID da categoria
-     * @param {boolean} updateSubcategories - Se deve atualizar subcategorias
-     * @param {string|number|null} newParentId - Novo ID de categoria pai para subcategorias
-     * @returns {Promise<Object>} Resposta da API
-     */
-    async deleteCategory(id, updateSubcategories = true, newParentId = null) {
-        if (!id) {
-            console.error('ID da categoria não fornecido');
-            return null;
-        }
-        
-        try {
-            // Remove a categoria via API
-            const response = await window.api.deleteCategory(id, updateSubcategories, newParentId);
-            
-            // Atualiza a lista local
-            await this.loadCategories();
-            
-            // Atualiza os caminhos de categoria dos produtos
-            if (typeof ProductManager !== 'undefined' && window.productManager) {
-                if (typeof window.productManager.updateProductCategoryPaths === 'function') {
-                    window.productManager.updateProductCategoryPaths();
-                }
-            }
-            
-            return response;
-        } catch (error) {
-            console.error('Erro ao remover categoria:', error);
-            
-            // Tenta remover localmente quando a API falha
-            try {
-                // Backup das categorias antes da exclusão
-                const oldCategories = [...this.categories];
-                
-                // Remove a categoria
-                this.categories = this.categories.filter(cat => cat.id !== id);
-                
-                // Atualiza subcategorias se necessário
-                if (updateSubcategories) {
-                    this.categories = this.categories.map(cat => {
-                        if (cat.parentId === id) {
-                            return { ...cat, parentId: newParentId };
-                        }
-                        return cat;
-                    });
-                }
-                
-                // Atualiza localStorage
-                localStorage.setItem('localCategories', JSON.stringify(this.categories));
-                
-                // Atualiza os caminhos de categoria dos produtos
-                if (typeof ProductManager !== 'undefined' && window.productManager) {
-                    if (typeof window.productManager.updateProductCategoryPaths === 'function') {
-                        window.productManager.updateProductCategoryPaths();
-                    }
-                }
-                
-                // Se tudo funcionou, retorna sucesso
-                return { success: true, message: 'Categoria excluída localmente' };
-            } catch (localError) {
-                console.error('Erro ao excluir categoria localmente:', localError);
-                throw error;
-            }
-        }
     }
 
     /**
@@ -547,4 +396,17 @@ window.categoryManager = categoryManager;
 // Configura a inicialização quando o DOM estiver carregado
 document.addEventListener('DOMContentLoaded', () => {
     console.log('CategoryManager inicializado com sucesso');
-}); 
+});
+
+/**
+ * Atualiza a interface de categorias
+ */
+function refreshCategoryUI() {
+    // Atualiza a lista de categorias na tabela
+    renderCategoryTable();
+    
+    // Atualiza os selects de categorias
+    updateCategorySelects();
+    
+    console.log('Interface de categorias atualizada');
+} 
