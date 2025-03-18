@@ -1,0 +1,19 @@
+[
+    {
+        "id": "cat1",
+        "name": "Bags e Mochilas"
+    },
+    {
+        "id": "cat2",
+        "name": "Equipamentos de Prote\u00e7\u00e3o"
+    },
+    {
+        "id": "cat3",
+        "name": "Acess\u00f3rios"
+    },
+    {
+        "name": "Solaris",
+        "parentId": null,
+        "id": "cat4"
+    }
+]

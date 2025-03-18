@@ -1,0 +1,535 @@
+/* Estilos para a página de checkout */
+.page-title {
+    text-align: center;
+    margin: 2rem 0;
+    color: #333;
+}
+
+.checkout-container {
+    padding: 2rem 0;
+}
+
+.checkout-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    max-width: 800px;
+    margin: 0 auto;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 2rem;
+}
+
+/* Estilos para o resumo do pedido */
+.order-summary {
+    margin-bottom: 2rem;
+}
+
+.order-summary h2 {
+    color: #333;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #eee;
+}
+
+.cart-item {
+    display: flex;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #eee;
+}
+
+.cart-item:last-child {
+    border-bottom: none;
+}
+
+.cart-item-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-right: 1rem;
+}
+
+.cart-item-info {
+    flex: 1;
+}
+
+.cart-item-name {
+    font-size: 1.1rem;
+    margin: 0 0 0.5rem;
+    color: #333;
+}
+
+.cart-item-price, 
+.cart-item-quantity,
+.cart-item-total {
+    font-size: 0.9rem;
+    color: #666;
+    margin: 0.3rem 0;
+}
+
+.cart-item-total {
+    font-weight: bold;
+    color: #333;
+}
+
+.empty-cart {
+    text-align: center;
+    color: #999;
+    padding: 2rem 0;
+}
+
+.order-total {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
+}
+
+.total {
+    display: flex;
+    justify-content: space-between;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #333;
+}
+
+/* Estilos para o formulário de dados do cliente */
+.customer-data {
+    margin-bottom: 2rem;
+}
+
+.customer-data h2 {
+    color: #333;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #eee;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #555;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.8rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.form-group input:focus {
+    border-color: #4a90e2;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+}
+
+/* Estilos para a seção de pagamento */
+.payment-options {
+    margin-bottom: 2rem;
+}
+
+.payment-options h2 {
+    color: #333;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #eee;
+}
+
+.payment-container {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.payment-instructions {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    color: #555;
+}
+
+.pix-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .pix-content {
+        flex-direction: row;
+        justify-content: space-around;
+    }
+}
+
+.qr-code-container {
+    text-align: center;
+}
+
+.qr-code {
+    width: 200px;
+    height: 200px;
+    margin: 0 auto 1rem;
+    display: block;
+    background-color: #fff;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.payment-status {
+    font-weight: 500;
+    color: #4a90e2;
+}
+
+.pix-code-container {
+    width: 100%;
+    max-width: 300px;
+}
+
+.copy-code-wrapper {
+    display: flex;
+    margin: 1rem 0;
+}
+
+.copy-code-wrapper input {
+    flex: 1;
+    padding: 0.8rem;
+    border: 1px solid #ddd;
+    border-radius: 4px 0 0 4px;
+    font-size: 0.9rem;
+    font-family: monospace;
+    color: #333;
+}
+
+.btn-copy {
+    padding: 0.8rem 1rem;
+    background-color: #4a90e2;
+    color: white;
+    border: none;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.btn-copy:hover {
+    background-color: #3a80d2;
+}
+
+.pix-expiration {
+    font-size: 0.8rem;
+    color: #777;
+    text-align: center;
+}
+
+.payment-actions {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+/* Estilos para botões */
+.btn {
+    padding: 0.8rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background-color: #4a90e2;
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: #3a80d2;
+}
+
+.btn-secondary {
+    background-color: #eee;
+    color: #333;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background-color: #ddd;
+}
+
+/* Estilos para o modal do carrinho */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    overflow: auto;
+}
+
+.modal-content {
+    background-color: #fff;
+    margin: 10% auto;
+    padding: 2rem;
+    border-radius: 8px;
+    max-width: 600px;
+    position: relative;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.close {
+    position: absolute;
+    top: 1rem;
+    right: 1.5rem;
+    font-size: 1.5rem;
+    color: #aaa;
+    cursor: pointer;
+}
+
+.close:hover {
+    color: #333;
+}
+
+.cart-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1.5rem;
+}
+
+/* Estilos para notificações */
+#notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+}
+
+.notification {
+    padding: 12px 20px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    color: white;
+    animation: slideIn 0.3s ease-out;
+    max-width: 350px;
+}
+
+.notification.success {
+    background-color: #28a745;
+}
+
+.notification.error {
+    background-color: #dc3545;
+}
+
+.notification.info {
+    background-color: #17a2b8;
+}
+
+.notification.hiding {
+    animation: slideOut 0.5s ease-out forwards;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .checkout-content {
+        padding: 1.5rem;
+    }
+    
+    .cart-item {
+        flex-direction: column;
+    }
+    
+    .cart-item-image {
+        width: 100%;
+        height: auto;
+        max-height: 150px;
+        margin-right: 0;
+        margin-bottom: 1rem;
+    }
+    
+    .modal-content {
+        margin: 5% auto;
+        width: 90%;
+    }
+    
+    .payment-actions {
+        flex-direction: column;
+    }
+}
+
+/* Estilo para o container do QR code */
+.pix-qrcode-container {
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.qr-code-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 320px;
+}
+
+.qr-code-display {
+    background-color: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    margin-bottom: 10px;
+    width: 256px;
+    height: 256px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#pix-qrcode-canvas {
+    display: block;
+    margin: 0 auto;
+}
+
+.payment-status {
+    margin-top: 10px;
+    font-weight: 600;
+    color: #f8c146;
+    text-align: center;
+}
+
+#save-qrcode {
+    margin-top: 10px;
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+#save-qrcode:hover {
+    background-color: #5a6268;
+}
+
+.pix-instructions {
+    margin-top: 20px;
+    background-color: #f0f8ff;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #007bff;
+}
+
+.pix-instructions p {
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+/* Estilo para o container do código PIX */
+.pix-code-container {
+    margin-top: 20px;
+}
+
+.copy-code-wrapper {
+    display: flex;
+    margin: 10px 0;
+}
+
+.copy-code-wrapper input {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px 0 0 4px;
+    font-family: monospace;
+}
+
+.btn-copy {
+    padding: 10px 15px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+}
+
+.btn-copy:hover {
+    background-color: #0069d9;
+}
+
+.pix-expiration {
+    font-size: 12px;
+    color: #666;
+    margin-top: 5px;
+}
+
+/* Botões de pagamento */
+.payment-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+#generate-pix {
+    background-color: #28a745;
+}
+
+#generate-pix:hover {
+    background-color: #218838;
+}
+
+#simulate-payment {
+    background-color: #fd7e14;
+    display: none;
+}
+
+#simulate-payment:hover {
+    background-color: #e56c07;
+} 

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Administrativo - Apoio Entrega</title>
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Scripts -->
+    <script src="js/api.js"></script>
+    <script src="js/categories.js"></script>
+    <script src="js/products.js"></script>
+    <script src="js/admin.js"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Barra Lateral -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>Apoio Entrega</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="sidebar-item active" data-section="products">
+                    <i class="fas fa-box"></i>
+                    <span>Produtos</span>
+                </a>
+                <a href="#" class="sidebar-item" data-section="categories">
+                    <i class="fas fa-tags"></i>
+                    <span>Categorias</span>
+                </a>
+                <a href="#" class="sidebar-item" data-section="carousel">
+                    <i class="fas fa-images"></i>
+                    <span>Carrossel</span>
+                </a>
+                <a href="#" class="sidebar-item" data-section="orders">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span>Pedidos</span>
+                </a>
+            </nav>
+        </div>
+        
+        <!-- Conteúdo Principal -->
+        <div class="main-content">
+            <header class="content-header">
+                <h1 id="page-title">Painel Administrativo</h1>
+            </header>
+            <div id="main-content"></div>
+        </div>
+    </div>
+    
+    <!-- Modal de Categoria -->
+    <div id="category-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Nova Categoria</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="category-form">
+                <div class="form-group">
+                    <label for="category-name">Nome da Categoria</label>
+                    <input type="text" id="category-name" name="name" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="save-btn">Salvar</button>
+                    <button type="button" class="cancel-btn" onclick="document.getElementById('category-modal').style.display='none'">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal de Produto -->
+    <div id="product-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Novo Produto</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="product-form">
+                <div class="form-group">
+                    <label for="product-name">Nome do Produto</label>
+                    <input type="text" id="product-name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="product-description">Descrição</label>
+                    <textarea id="product-description" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="product-category">Categoria</label>
+                    <select id="product-category" name="categoryId" required>
+                        <option value="">Selecione uma categoria</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="product-price">Preço</label>
+                        <input type="number" id="product-price" name="price" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="product-stock">Estoque</label>
+                        <input type="number" id="product-stock" name="stock" min="0" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group checkbox">
+                        <input type="checkbox" id="product-new" name="isNew">
+                        <label for="product-new">Produto Novo</label>
+                    </div>
+                    <div class="form-group checkbox">
+                        <input type="checkbox" id="product-sale" name="sale">
+                        <label for="product-sale">Em Promoção</label>
+                    </div>
+                </div>
+                <div class="form-group sale-price" style="display: none;">
+                    <label for="product-sale-price">Preço Promocional</label>
+                    <input type="number" id="product-sale-price" name="salePrice" step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="product-image">Imagem</label>
+                    <input type="file" id="product-image" name="image" accept="image/*">
+                    <img id="product-image-preview" class="image-preview" style="display: none;">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="save-btn">Salvar</button>
+                    <button type="button" class="cancel-btn" onclick="document.getElementById('product-modal').style.display='none'">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal de Confirmação -->
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Confirmar Ação</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p class="confirm-message"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="confirm-button">Confirmar</button>
+                <button class="cancel-button" onclick="document.getElementById('confirm-modal').style.display='none'">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal do Carrossel -->
+    <div id="carousel-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Novo Item do Carrossel</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="carousel-form">
+                <div class="form-group">
+                    <label for="carousel-title">Título</label>
+                    <input type="text" id="carousel-title" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="carousel-description">Descrição</label>
+                    <textarea id="carousel-description" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="carousel-link">Link (opcional)</label>
+                    <input type="url" id="carousel-link" name="link" placeholder="https://">
+                </div>
+                <div class="form-group">
+                    <label for="carousel-image">Imagem</label>
+                    <input type="file" id="carousel-image" name="image" accept="image/*" required>
+                    <img id="carousel-image-preview" class="image-preview" style="display: none;">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="save-btn">Salvar</button>
+                    <button type="button" class="cancel-btn" onclick="document.getElementById('carousel-modal').style.display='none'">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html> 

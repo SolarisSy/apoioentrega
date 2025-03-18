@@ -1,0 +1,62 @@
+[
+    {
+        "id": 1,
+        "name": "Mochila Térmica para Entrega",
+        "description": "Mochila térmica de alta qualidade para entregadores, com capacidade de 45 litros. Ideal para manter alimentos quentes ou frios durante as entregas. Material resistente e impermeável.",
+        "price": 189.90,
+        "stock": 25,
+        "categoryId": "cat1",
+        "image": "img/mochila-termica.jpg",
+        "featured": true,
+        "sale": false,
+        "salePrice": 0
+    },
+    {
+        "id": 2,
+        "name": "Bag Térmica para Moto",
+        "description": "Bag térmica para moto com capacidade de 35 litros. Perfeita para entregas de alimentos, mantendo a temperatura ideal por mais tempo. Inclui alças reforçadas e fechamento com zíper.",
+        "price": 149.90,
+        "stock": 30,
+        "categoryId": "cat1",
+        "image": "img/bag-termica.jpg",
+        "featured": true,
+        "sale": true,
+        "salePrice": 129.90
+    },
+    {
+        "id": 3,
+        "name": "Capa de Chuva para Motoqueiro",
+        "description": "Capa de chuva impermeável para motoqueiros, com faixas refletivas para maior segurança. Protege contra chuva e vento, mantendo o entregador seco durante as entregas.",
+        "price": 79.90,
+        "stock": 50,
+        "categoryId": "cat2",
+        "image": "img/capa-chuva.jpg",
+        "featured": false,
+        "sale": false,
+        "salePrice": 0
+    },
+    {
+        "id": 4,
+        "name": "Luvas para Motoqueiro",
+        "description": "Luvas de proteção para motoqueiros, com reforço nos dedos e palma da mão. Oferece aderência e proteção contra impactos e abrasões. Ideal para uso diário em entregas.",
+        "price": 59.90,
+        "stock": 40,
+        "categoryId": "cat2",
+        "image": "img/luvas.jpg",
+        "featured": false,
+        "sale": true,
+        "salePrice": 49.90
+    },
+    {
+        "id": 5,
+        "name": "Capacete para Motoqueiro",
+        "description": "Capacete de alta qualidade para motoqueiros, com viseira e sistema de ventilação. Aprovado pelo INMETRO, oferece proteção e conforto durante as entregas.",
+        "price": 199.90,
+        "stock": 20,
+        "categoryId": "cat2",
+        "image": "img/capacete.jpg",
+        "featured": true,
+        "sale": false,
+        "salePrice": 0
+    }
+] 

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedido Confirmado - Apoio Entrega</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/checkout.css">
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <div class="logo">
+                <a href="index.html">
+                    <img src="img/marca_apoio_entrega@2x.png" alt="Apoio Entrega" class="brand-image">
+                </a>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="index.html#produtos">Produtos</a></li>
+                    <li><a href="contato.html">Contato</a></li>
+                    <li><a href="sobre.html">Sobre</a></li>
+                </ul>
+            </nav>
+            <div class="user-actions">
+                <div class="user-menu">
+                    <a href="#" id="login-btn" class="login-btn"><i class="fas fa-user"></i> Entrar</a>
+                    <div class="user-dropdown" id="user-dropdown">
+                        <a href="#" id="login-link">Login</a>
+                        <a href="#" id="register-link">Cadastrar</a>
+                        <a href="#" id="logout-link" style="display: none;">Sair</a>
+                    </div>
+                </div>
+                <a href="#" class="cart-btn" id="cart-btn">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span class="cart-count" id="cart-count">0</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main>
+        <section class="confirmation-container">
+            <div class="container">
+                <div class="confirmation-content">
+                    <div class="confirmation-header">
+                        <i class="fas fa-check-circle"></i>
+                        <h1>Pedido Confirmado!</h1>
+                        <p>Seu pagamento foi aprovado e seu pedido está sendo processado.</p>
+                    </div>
+                    
+                    <div class="order-details">
+                        <h2>Detalhes do Pedido</h2>
+                        <div class="order-info">
+                            <div class="order-info-item">
+                                <span>Número do Pedido:</span>
+                                <span id="order-id">Carregando...</span>
+                            </div>
+                            <div class="order-info-item">
+                                <span>Data:</span>
+                                <span id="order-date">Carregando...</span>
+                            </div>
+                            <div class="order-info-item">
+                                <span>Status:</span>
+                                <span id="order-status">Carregando...</span>
+                            </div>
+                            <div class="order-info-item">
+                                <span>Forma de Pagamento:</span>
+                                <span id="order-payment">Carregando...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="order-items">
+                        <h2>Itens do Pedido</h2>
+                        <div id="order-items-list">
+                            <!-- Itens do pedido serão carregados dinamicamente -->
+                            <p>Carregando itens...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="order-total">
+                        <div class="total-item">
+                            <span>Subtotal:</span>
+                            <span id="order-subtotal">R$ 0,00</span>
+                        </div>
+                        <div class="total-item">
+                            <span>Frete:</span>
+                            <span id="order-shipping">R$ 0,00</span>
+                        </div>
+                        <div class="total-item total">
+                            <span>Total:</span>
+                            <span id="order-total">R$ 0,00</span>
+                        </div>
+                    </div>
+                    
+                    <div class="confirmation-actions">
+                        <a href="index.html" class="btn btn-primary">Continuar Comprando</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">
+                    <img src="img/marca_apoio_entrega@2x.png" alt="Apoio Entrega" class="brand-image">
+                    <p>Soluções completas para seu negócio</p>
+                </div>
+                <div class="footer-links">
+                    <h3>Links Rápidos</h3>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="index.html#produtos">Produtos</a></li>
+                        <li><a href="contato.html">Contato</a></li>
+                        <li><a href="sobre.html">Sobre</a></li>
+                    </ul>
+                </div>
+                <div class="footer-contact">
+                    <h3>Contato</h3>
+                    <p><i class="fas fa-map-marker-alt"></i> Rua Exemplo, 123 - São Paulo/SP</p>
+                    <p><i class="fas fa-phone"></i> (11) 1234-5678</p>
+                    <p><i class="fas fa-envelope"></i> contato@apoioentrega.com.br</p>
+                </div>
+                <div class="footer-social">
+                    <h3>Redes Sociais</h3>
+                    <div class="social-icons">
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                        <a href="#"><i class="fab fa-linkedin"></i></a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2023 Apoio Entrega. Todos os direitos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div class="modal-tabs">
+                <button class="tab-btn active" data-tab="login-tab">Login</button>
+                <button class="tab-btn" data-tab="register-tab">Cadastro</button>
+            </div>
+            <div id="login-tab" class="tab-content active">
+                <h2>Login</h2>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="login-email">E-mail</label>
+                        <input type="email" id="login-email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Senha</label>
+                        <input type="password" id="login-password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Entrar</button>
+                </form>
+            </div>
+            <div id="register-tab" class="tab-content">
+                <h2>Cadastro</h2>
+                <form id="register-form">
+                    <div class="form-group">
+                        <label for="register-name">Nome</label>
+                        <input type="text" id="register-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="register-email">E-mail</label>
+                        <input type="email" id="register-email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="register-password">Senha</label>
+                        <input type="password" id="register-password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="register-phone">Telefone</label>
+                        <input type="tel" id="register-phone">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Cadastrar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cart Modal -->
+    <div id="cart-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Seu Carrinho</h2>
+            <div id="cart-items">
+                <!-- Itens do carrinho serão carregados dinamicamente -->
+            </div>
+            <div id="cart-total">
+                <p>Total: <span id="cart-total-value">R$ 0,00</span></p>
+            </div>
+            <div class="cart-actions">
+                <button id="clear-cart" class="btn btn-secondary">Limpar Carrinho</button>
+                <button id="checkout-btn" class="btn btn-primary">Finalizar Compra</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notification-container"></div>
+
+    <!-- Scripts -->
+    <script type="module">
+        import Auth from './js/auth.js';
+        import Cart from './js/cart.js';
+        import Orders from './js/orders.js';
+        import Notifications from './js/notifications.js';
+
+        // Inicializa os módulos
+        Auth.init();
+        Cart.init();
+        
+        // Elementos da interface
+        const orderId = document.getElementById('order-id');
+        const orderDate = document.getElementById('order-date');
+        const orderStatus = document.getElementById('order-status');
+        const orderPayment = document.getElementById('order-payment');
+        const orderItemsList = document.getElementById('order-items-list');
+        const orderSubtotal = document.getElementById('order-subtotal');
+        const orderShipping = document.getElementById('order-shipping');
+        const orderTotal = document.getElementById('order-total');
+        
+        // Botão de checkout na página de confirmação
+        const checkoutBtn = document.getElementById('checkout-btn');
+        if (checkoutBtn) {
+            checkoutBtn.addEventListener('click', () => {
+                // Fechando o modal
+                const modal = checkoutBtn.closest('.modal');
+                if (modal) {
+                    modal.style.display = 'none';
+                }
+                // Exibindo mensagem explicativa
+                Notifications.info('Atenção', 'Você já finalizou uma compra. Para uma nova compra, retorne à página inicial.');
+            });
+        }
+        
+        // Carrega os detalhes do pedido
+        function loadOrderDetails() {
+            try {
+                // Obtém o ID da transação da URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const transactionId = urlParams.get('transaction');
+                
+                if (!transactionId) {
+                    Notifications.erro('Erro', 'ID da transação não encontrado');
+                    return;
+                }
+                
+                // Busca a transação no localStorage
+                const transactionData = JSON.parse(localStorage.getItem('current_transaction') || '{}');
+                
+                if (!transactionData || !transactionData.orderId) {
+                    Notifications.erro('Erro', 'Dados da transação não encontrados');
+                    return;
+                }
+                
+                // Busca o pedido pelo ID
+                const order = Orders.getById(transactionData.orderId);
+                
+                if (!order) {
+                    Notifications.erro('Erro', 'Pedido não encontrado');
+                    return;
+                }
+                
+                // Atualiza os detalhes do pedido na interface
+                updateOrderDetails(order);
+                
+                // Limpa o carrinho após a confirmação
+                Cart.clearCart();
+                
+                // Limpa os dados da transação atual
+                localStorage.removeItem('current_transaction');
+                
+            } catch (error) {
+                console.error('Erro ao carregar detalhes do pedido:', error);
+                Notifications.erro('Erro', 'Não foi possível carregar os detalhes do pedido');
+            }
+        }
+        
+        // Atualiza os detalhes do pedido na interface
+        function updateOrderDetails(order) {
+            // Atualiza os detalhes básicos
+            orderId.textContent = order.id.substring(0, 8);
+            orderDate.textContent = Orders.formatDate(order.createdAt);
+            orderStatus.textContent = Orders.getStatusDescription(order.status);
+            orderPayment.textContent = 'PIX';
+            
+            // Atualiza os itens do pedido
+            let html = '';
+            
+            if (order.items && order.items.length > 0) {
+                order.items.forEach(item => {
+                    html += `
+                        <div class="order-item">
+                            <div class="order-item-image">
+                                <img src="${item.image}" alt="${item.name}">
+                            </div>
+                            <div class="order-item-details">
+                                <h3>${item.name}</h3>
+                                <p>Quantidade: ${item.quantity}</p>
+                            </div>
+                            <div class="order-item-price">
+                                R$ ${(item.price * item.quantity).toFixed(2)}
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                html = '<p>Nenhum item encontrado</p>';
+            }
+            
+            orderItemsList.innerHTML = html;
+            
+            // Atualiza os totais
+            orderSubtotal.textContent = Orders.formatCurrency(order.subtotal);
+            orderShipping.textContent = Orders.formatCurrency(order.shipping);
+            orderTotal.textContent = Orders.formatCurrency(order.total);
+        }
+        
+        // Event Listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            // Carrega os detalhes do pedido
+            loadOrderDetails();
+        });
+    </script>
+</body>
+</html> 

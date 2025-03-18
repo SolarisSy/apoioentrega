@@ -1,0 +1,1384 @@
+/**
+ * Sistema de Administração
+ * Versão 2.0
+ */
+
+// Inicializa o serviço de API
+if (typeof window.api === 'undefined' && typeof ApiService !== 'undefined') {
+    window.api = new ApiService('server');
+}
+
+document.addEventListener('DOMContentLoaded', async function() {
+    // Adicionar estilos para a mensagem de funcionalidade em desenvolvimento
+    const style = document.createElement('style');
+    style.textContent = `
+        .section-message {
+            padding: 20px;
+            margin: 20px 0;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 5px solid #6c757d;
+            font-size: 16px;
+            color: #495057;
+            text-align: center;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    await initAdmin();
+});
+
+/**
+ * Inicializa o painel administrativo
+ */
+async function initAdmin() {
+    // Inicializa os componentes principais
+    initSidebar();
+    initModals();
+    initImageUpload();
+    initCarouselData();
+    
+    // Carrega a seção inicial (produtos por padrão)
+    const defaultSection = document.querySelector('.sidebar-item');
+    if (defaultSection) {
+        defaultSection.click();
+    }
+}
+
+/**
+ * Inicializa os dados do carrossel
+ */
+async function initCarouselData() {
+    try {
+        console.log('Inicializando dados do carrossel...');
+        
+        // Verifica se existem dados em qualquer um dos sistemas
+        const hasAdminData = localStorage.getItem('carousel') !== null;
+        const hasMainData = localStorage.getItem('carouselSlides') !== null;
+        
+        if (!hasAdminData && !hasMainData) {
+            console.log('Nenhum dado de carrossel encontrado, criando dados padrão...');
+            
+            // Cria slides padrão
+            const defaultSlides = [
+                {
+                    id: 1,
+                    title: "Apoio Entrega",
+                    subtitle: "Sua loja online de confiança",
+                    buttonText: "",
+                    buttonLink: "",
+                    image: "https://via.placeholder.com/1920x500/4a90e2/ffffff?text=Apoio+Entrega",
+                    order: 1
+                },
+                {
+                    id: 2,
+                    title: "Produtos de Qualidade",
+                    subtitle: "As melhores marcas para você",
+                    buttonText: "",
+                    buttonLink: "",
+                    image: "https://via.placeholder.com/1920x500/f5a623/ffffff?text=Produtos+de+Qualidade",
+                    order: 2
+                },
+                {
+                    id: 3,
+                    title: "Equipamentos Profissionais",
+                    subtitle: "Tudo para seu negócio",
+                    buttonText: "",
+                    buttonLink: "",
+                    image: "https://via.placeholder.com/1920x500/28a745/ffffff?text=Equipamentos+Profissionais",
+                    order: 3
+                }
+            ];
+            
+            // Cria itens para o painel admin
+            const adminItems = defaultSlides.map(slide => ({
+                title: slide.title || `Slide ${slide.id}`,
+                description: slide.subtitle || '',
+                link: slide.buttonLink || '',
+                imageUrl: slide.image,
+                slideId: slide.id
+            }));
+            
+            // Salva em ambos os sistemas
+            localStorage.setItem('carousel', JSON.stringify(adminItems));
+            localStorage.setItem('carouselSlides', JSON.stringify(defaultSlides));
+            
+            console.log('Dados padrão do carrossel criados com sucesso');
+        } 
+        else if (hasAdminData && !hasMainData) {
+            // Tem dados no admin mas não no main
+            console.log('Sincronizando dados do admin para o main...');
+            const adminItems = JSON.parse(localStorage.getItem('carousel'));
+            
+            // Converte para o formato do main
+            const mainSlides = adminItems.map((item, index) => ({
+                id: item.slideId || Date.now() + index,
+                title: item.title,
+                subtitle: item.description,
+                buttonText: '',
+                buttonLink: item.link,
+                image: item.imageUrl,
+                order: index + 1
+            }));
+            
+            localStorage.setItem('carouselSlides', JSON.stringify(mainSlides));
+            console.log('Dados sincronizados do admin para o main');
+        } 
+        else if (!hasAdminData && hasMainData) {
+            // Tem dados no main mas não no admin
+            console.log('Sincronizando dados do main para o admin...');
+            const mainSlides = JSON.parse(localStorage.getItem('carouselSlides'));
+            
+            // Converte para o formato do admin
+            const adminItems = mainSlides.map(slide => ({
+                title: slide.title || `Slide ${slide.id}`,
+                description: slide.subtitle || '',
+                link: slide.buttonLink || '',
+                imageUrl: slide.image,
+                slideId: slide.id
+            }));
+            
+            localStorage.setItem('carousel', JSON.stringify(adminItems));
+            console.log('Dados sincronizados do main para o admin');
+        }
+        else {
+            // Ambos têm dados, verifica se estão sincronizados
+            console.log('Verificando sincronização entre os sistemas...');
+            const adminItems = JSON.parse(localStorage.getItem('carousel'));
+            const mainSlides = JSON.parse(localStorage.getItem('carouselSlides'));
+            
+            // Verifica se todos os slides do main têm correspondência no admin
+            const mainIds = mainSlides.map(slide => slide.id);
+            const adminIds = adminItems.map(item => item.slideId).filter(id => id);
+            
+            const needsSync = !mainIds.every(id => adminIds.includes(id)) || 
+                             !adminIds.every(id => mainIds.includes(id)) ||
+                             mainIds.length !== adminIds.length;
+            
+            if (needsSync) {
+                console.log('Inconsistência detectada, sincronizando sistemas...');
+                
+                // Usa os dados do main como fonte da verdade
+                const syncedAdminItems = mainSlides.map(slide => ({
+                    title: slide.title || `Slide ${slide.id}`,
+                    description: slide.subtitle || '',
+                    link: slide.buttonLink || '',
+                    imageUrl: slide.image,
+                    slideId: slide.id
+                }));
+                
+                localStorage.setItem('carousel', JSON.stringify(syncedAdminItems));
+                console.log('Sistemas sincronizados com sucesso');
+            } else {
+                console.log('Sistemas já estão sincronizados');
+            }
+        }
+        
+        // Garante que existam arrays vazios se algo deu errado
+        if (!localStorage.getItem('carousel')) {
+            localStorage.setItem('carousel', JSON.stringify([]));
+        }
+        if (!localStorage.getItem('carouselSlides')) {
+            localStorage.setItem('carouselSlides', JSON.stringify([]));
+        }
+        
+        console.log('Inicialização dos dados do carrossel concluída');
+    } catch (error) {
+        console.error('Erro ao inicializar dados do carrossel:', error);
+        // Garante que existam arrays vazios mesmo em caso de erro
+        localStorage.setItem('carousel', JSON.stringify([]));
+        localStorage.setItem('carouselSlides', JSON.stringify([]));
+    }
+}
+
+/**
+ * Inicializa a barra lateral
+ */
+function initSidebar() {
+    const sidebarItems = document.querySelectorAll('.sidebar-item');
+    
+    sidebarItems.forEach(item => {
+        item.addEventListener('click', async () => {
+            // Remove a classe ativa de todos os itens
+            sidebarItems.forEach(i => i.classList.remove('active'));
+            
+            // Adiciona a classe ativa ao item clicado
+            item.classList.add('active');
+            
+            // Obtém o ID da seção
+            const sectionId = item.getAttribute('data-section');
+            
+            // Atualiza o título da página
+            updatePageTitle(sectionId);
+            
+            // Carrega a seção correspondente
+            await loadSection(sectionId);
+        });
+    });
+}
+
+/**
+ * Atualiza o título da página
+ */
+function updatePageTitle(sectionId) {
+    const titleElement = document.getElementById('page-title');
+    if (!titleElement) return;
+    
+    const titles = {
+        products: 'Gerenciar Produtos',
+        categories: 'Gerenciar Categorias',
+        carousel: 'Gerenciar Carrossel',
+        orders: 'Gerenciar Pedidos'
+    };
+    
+    titleElement.textContent = titles[sectionId] || 'Painel Administrativo';
+}
+
+/**
+ * Carrega uma seção específica
+ */
+async function loadSection(sectionId) {
+    const mainContent = document.getElementById('main-content');
+    if (!mainContent) return;
+    
+    // Limpa o conteúdo atual
+    mainContent.innerHTML = '';
+    
+    // Carrega a seção apropriada
+    switch (sectionId) {
+        case 'products':
+            await initProductsSection();
+            break;
+        case 'categories':
+            await initCategoriesSection();
+            break;
+        case 'carousel':
+            await initCarouselSection();
+            break;
+        case 'orders':
+            await initOrdersSection();
+            break;
+    }
+}
+
+/**
+ * Inicializa a seção de produtos
+ */
+async function initProductsSection() {
+    const mainContent = document.getElementById('main-content');
+    
+    // Cria o HTML da seção
+    mainContent.innerHTML = `
+        <div class="section-header">
+            <button class="add-button" onclick="openProductModal()">
+                <i class="fas fa-plus"></i> Novo Produto
+            </button>
+            <div class="search-box">
+                <input type="text" id="product-search" placeholder="Buscar produtos...">
+                <select id="category-filter">
+                    <option value="">Todas as categorias</option>
+                </select>
+            </div>
+        </div>
+        <div class="table-container">
+            <table id="products-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Imagem</th>
+                        <th>Nome</th>
+                        <th>Categoria</th>
+                        <th>Preço</th>
+                        <th>Estoque</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    `;
+    
+    // Inicializa os componentes
+    await loadProducts();
+    initProductSearch();
+    updateCategoryFilter();
+}
+
+/**
+ * Carrega os produtos na tabela
+ */
+async function loadProducts() {
+    const tableBody = document.querySelector('#products-table tbody');
+    if (!tableBody) return;
+    
+    try {
+        // Obtém os produtos
+        const products = productManager.getAllProducts();
+        
+        // Limpa a tabela
+        tableBody.innerHTML = '';
+        
+        // Adiciona cada produto
+        products.forEach(product => {
+            const row = document.createElement('tr');
+            
+            // Obtém o caminho da categoria
+            const categoryPath = product.categoryPath || productManager.getCategoryPathById(product.categoryId) || 'Sem categoria';
+            
+            row.innerHTML = `
+                <td>${product.id}</td>
+                <td>
+                    <img src="${product.imageUrl || product.image}" alt="${product.name}" class="product-thumbnail">
+                </td>
+                <td>${product.name}</td>
+                <td>${categoryPath}</td>
+                <td>${formatPrice(product.price)}</td>
+                <td>${product.stock}</td>
+                <td>
+                    <button class="edit-btn" onclick="openProductModal(${product.id})">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="delete-btn" onclick="confirmDeleteProduct(${product.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            
+            tableBody.appendChild(row);
+        });
+    } catch (error) {
+        console.error('Erro ao carregar produtos:', error);
+        showNotification('Erro ao carregar produtos', 'error');
+    }
+}
+
+/**
+ * Inicializa a seção de categorias
+ */
+async function initCategoriesSection() {
+    const mainContent = document.getElementById('main-content');
+    
+    // Cria o HTML da seção
+    mainContent.innerHTML = `
+        <div class="section-header">
+            <button class="add-button" onclick="addCategory()">
+                <i class="fas fa-plus"></i> Nova Categoria
+            </button>
+        </div>
+        <div class="categories-container">
+            <div id="categories-tree"></div>
+        </div>
+    `;
+    
+    // Renderiza a árvore de categorias
+    await renderCategoriesTree();
+}
+
+/**
+ * Renderiza a árvore de categorias
+ */
+async function renderCategoriesTree() {
+    const container = document.getElementById('categories-tree');
+    if (!container) return;
+    
+    try {
+        // Obtém a hierarquia de categorias
+        const hierarchy = categoryManager.getCategoryHierarchy();
+        
+        // Limpa o container
+        container.innerHTML = '';
+        
+        // Renderiza cada categoria principal
+        hierarchy.forEach(category => {
+            container.appendChild(createCategoryNode(category));
+        });
+    } catch (error) {
+        console.error('Erro ao renderizar categorias:', error);
+        showNotification('Erro ao carregar categorias', 'error');
+    }
+}
+
+/**
+ * Cria um nó da árvore de categorias
+ */
+function createCategoryNode(category, level = 0) {
+    const node = document.createElement('div');
+    node.className = 'category-node';
+    node.dataset.id = category.id;
+    node.dataset.level = level;
+    
+    // Adiciona indentação para subcategorias
+    const indent = '\u00A0\u00A0\u00A0\u00A0'.repeat(level);
+    
+    node.innerHTML = `
+        <div class="category-content">
+            <span class="category-name">${indent}${category.name}</span>
+            <div class="category-actions">
+                <button class="add-subcategory-btn" onclick="addSubcategory('${category.id}')">
+                    <i class="fas fa-plus"></i>
+                </button>
+                <button class="edit-btn" onclick="editCategory('${category.id}')">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="delete-btn" onclick="confirmDeleteCategory('${category.id}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Adiciona subcategorias recursivamente
+    if (category.subcategories && category.subcategories.length > 0) {
+        const subcategoriesContainer = document.createElement('div');
+        subcategoriesContainer.className = 'subcategories';
+        
+        category.subcategories.forEach(subcategory => {
+            subcategoriesContainer.appendChild(createCategoryNode(subcategory, level + 1));
+        });
+        
+        node.appendChild(subcategoriesContainer);
+    }
+    
+    return node;
+}
+
+/**
+ * Adiciona uma nova categoria
+ */
+function addCategory(parentId = null) {
+    openCategoryModal(null, parentId);
+}
+
+/**
+ * Adiciona uma subcategoria
+ */
+function addSubcategory(parentId) {
+    openCategoryModal(null, parentId);
+}
+
+/**
+ * Edita uma categoria existente
+ */
+function editCategory(categoryId) {
+    openCategoryModal(categoryId);
+}
+
+/**
+ * Abre o modal de categoria
+ */
+function openCategoryModal(categoryId = null, parentId = null) {
+    const modal = document.getElementById('category-modal');
+    const form = document.getElementById('category-form');
+    const titleElement = modal.querySelector('.modal-title');
+    
+    // Limpa o formulário
+    form.reset();
+    
+    // Configura o ID da categoria
+    form.dataset.categoryId = categoryId || '';
+    form.dataset.parentId = parentId || '';
+    
+    // Atualiza o título do modal
+    if (categoryId) {
+        titleElement.textContent = 'Editar Categoria';
+        const category = categoryManager.getCategoryById(categoryId);
+        if (category) {
+            form.elements.name.value = category.name;
+        }
+    } else {
+        titleElement.textContent = parentId ? 'Nova Subcategoria' : 'Nova Categoria';
+    }
+    
+    // Exibe o modal
+    modal.style.display = 'block';
+}
+
+/**
+ * Salva uma categoria
+ */
+async function saveCategory(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const categoryId = form.dataset.categoryId;
+    const parentId = form.dataset.parentId;
+    const name = form.elements.name.value.trim();
+    
+    if (!name) {
+        showNotification('Nome da categoria é obrigatório', 'error');
+        return;
+    }
+    
+    try {
+        if (categoryId) {
+            // Atualiza categoria existente
+            categoryManager.updateCategory(categoryId, name);
+            showNotification('Categoria atualizada com sucesso');
+        } else {
+            // Adiciona nova categoria
+            categoryManager.addCategory(name, parentId || null);
+            showNotification('Categoria criada com sucesso');
+        }
+        
+        // Fecha o modal
+        const modal = document.getElementById('category-modal');
+        modal.style.display = 'none';
+        
+        // Atualiza a árvore de categorias
+        await renderCategoriesTree();
+        
+        // Atualiza o select de categorias na seção de produtos
+        updateCategoryFilter();
+    } catch (error) {
+        console.error('Erro ao salvar categoria:', error);
+        showNotification('Erro ao salvar categoria', 'error');
+    }
+}
+
+/**
+ * Confirma a exclusão de uma categoria
+ */
+function confirmDeleteCategory(categoryId) {
+    const category = categoryManager.getCategoryById(categoryId);
+    if (!category) return;
+    
+    const hasSubcategories = categoryManager.hasSubcategories(categoryId);
+    let message = `Deseja excluir a categoria "${category.name}"?`;
+    
+    if (hasSubcategories) {
+        message += '\nTodas as subcategorias também serão excluídas.';
+    }
+    
+    openConfirmModal(message, () => deleteCategory(categoryId));
+}
+
+/**
+ * Exclui uma categoria
+ */
+async function deleteCategory(categoryId) {
+    try {
+        categoryManager.deleteCategory(categoryId, true);
+        showNotification('Categoria excluída com sucesso');
+        
+        // Atualiza a árvore de categorias
+        await renderCategoriesTree();
+        
+        // Atualiza o select de categorias na seção de produtos
+        updateCategoryFilter();
+    } catch (error) {
+        console.error('Erro ao excluir categoria:', error);
+        showNotification('Erro ao excluir categoria', 'error');
+    }
+}
+
+/**
+ * Atualiza o filtro de categorias na seção de produtos
+ */
+function updateCategoryFilter() {
+    const select = document.getElementById('category-filter');
+    if (!select) return;
+    
+    // Limpa as opções atuais
+    select.innerHTML = '<option value="">Todas as categorias</option>';
+    
+    // Obtém todas as categorias em formato plano
+    const categories = categoryManager.getFlatCategories();
+    
+    // Adiciona as opções
+    categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category.id;
+        option.textContent = category.path;
+        select.appendChild(option);
+    });
+    
+    // Adiciona evento de mudança
+    select.onchange = filterProducts;
+}
+
+/**
+ * Filtra os produtos por categoria e termo de busca
+ */
+function filterProducts() {
+    const searchInput = document.getElementById('product-search');
+    const categorySelect = document.getElementById('category-filter');
+    const tableBody = document.querySelector('#products-table tbody');
+    
+    if (!tableBody) return;
+    
+    const searchTerm = searchInput.value.toLowerCase();
+    const categoryId = categorySelect.value;
+    
+    // Obtém todos os produtos
+    let products = productManager.getAllProducts();
+    
+    // Filtra por categoria
+    if (categoryId) {
+        products = productManager.getProductsByCategory(categoryId, true);
+    }
+    
+    // Filtra por termo de busca
+    if (searchTerm) {
+        products = products.filter(product => 
+            product.name.toLowerCase().includes(searchTerm) ||
+            (product.description && product.description.toLowerCase().includes(searchTerm))
+        );
+    }
+    
+    // Atualiza a tabela
+    tableBody.innerHTML = '';
+    
+    products.forEach(product => {
+        const row = document.createElement('tr');
+        
+        // Obtém o caminho da categoria
+        const categoryPath = product.categoryPath || productManager.getCategoryPathById(product.categoryId) || 'Sem categoria';
+        
+        row.innerHTML = `
+            <td>${product.id}</td>
+            <td>
+                <img src="${product.imageUrl || product.image}" alt="${product.name}" class="product-thumbnail">
+            </td>
+            <td>${product.name}</td>
+            <td>${categoryPath}</td>
+            <td>${formatPrice(product.price)}</td>
+            <td>${product.stock}</td>
+            <td>
+                <button class="edit-btn" onclick="openProductModal(${product.id})">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="delete-btn" onclick="confirmDeleteProduct(${product.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        
+        tableBody.appendChild(row);
+    });
+}
+
+/**
+ * Inicializa a busca de produtos
+ */
+function initProductSearch() {
+    const searchInput = document.getElementById('product-search');
+    if (!searchInput) return;
+    
+    searchInput.addEventListener('input', filterProducts);
+}
+
+/**
+ * Abre o modal de produto
+ */
+function openProductModal(productId = null) {
+    const modal = document.getElementById('product-modal');
+    const form = document.getElementById('product-form');
+    const titleElement = modal.querySelector('.modal-title');
+    const imagePreview = document.getElementById('product-image-preview');
+    
+    // Limpa o formulário
+    form.reset();
+    
+    // Configura o ID do produto
+    form.dataset.productId = productId || '';
+    
+    // Atualiza o select de categorias
+    const categorySelect = form.elements.categoryId;
+    categorySelect.innerHTML = '<option value="">Selecione uma categoria</option>';
+    
+    const categories = categoryManager.getFlatCategories();
+    categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category.id;
+        option.textContent = category.path;
+        categorySelect.appendChild(option);
+    });
+    
+    if (productId) {
+        // Modo de edição
+        titleElement.textContent = 'Editar Produto';
+        const product = productManager.getProductById(productId);
+        
+        if (product) {
+            form.elements.name.value = product.name;
+            form.elements.description.value = product.description || '';
+            form.elements.price.value = product.price;
+            form.elements.stock.value = product.stock;
+            form.elements.categoryId.value = product.categoryId || '';
+            form.elements.isNew.checked = product.isNew || false;
+            form.elements.sale.checked = product.sale || false;
+            form.elements.salePrice.value = product.salePrice || '';
+            
+            if (product.image) {
+                imagePreview.src = product.imageUrl || product.image;
+                imagePreview.style.display = 'block';
+            }
+        }
+    } else {
+        // Modo de criação
+        titleElement.textContent = 'Novo Produto';
+        imagePreview.style.display = 'none';
+    }
+    
+    // Exibe o modal
+    modal.style.display = 'block';
+}
+
+/**
+ * Salva um produto
+ */
+async function saveProduct(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const productId = form.dataset.productId;
+    const formData = new FormData(form);
+    
+    // Valida os campos obrigatórios
+    const name = formData.get('name').trim();
+    const price = parseFloat(formData.get('price'));
+    const stock = parseInt(formData.get('stock'));
+    const categoryId = formData.get('categoryId');
+    
+    if (!name || isNaN(price) || isNaN(stock)) {
+        showNotification('Preencha todos os campos obrigatórios', 'error');
+        return;
+    }
+    
+    try {
+        // Prepara os dados do produto
+        const productData = {
+            name,
+            description: formData.get('description').trim(),
+            price,
+            stock,
+            categoryId: categoryId || null,
+            isNew: formData.get('isNew') === 'on',
+            sale: formData.get('sale') === 'on',
+            salePrice: parseFloat(formData.get('salePrice')) || null
+        };
+        
+        // Obtém a imagem
+        const imageFile = form.elements.image.files[0];
+        if (imageFile) {
+            try {
+                const imagePath = await window.api.uploadImage(imageFile);
+                productData.image = imagePath;
+            } catch (error) {
+                console.error('Erro ao fazer upload de imagem:', error);
+                showNotification('Erro ao enviar a imagem. O produto será salvo sem imagem.', 'warning');
+            }
+        } else if (productId) {
+            // Se estamos editando e não foi enviada nova imagem, mantém a imagem atual
+            const existingProduct = productManager.getProductById(parseInt(productId));
+            if (existingProduct && existingProduct.image) {
+                productData.image = existingProduct.image;
+            }
+        }
+        
+        if (productId) {
+            // Atualiza o ID para o produto existente
+            productData.id = parseInt(productId);
+            
+            // Atualiza produto existente via API
+            await window.api.updateProduct(productData);
+            showNotification('Produto atualizado com sucesso');
+        } else {
+            // Adiciona novo produto via API
+            await window.api.addProduct(productData);
+            showNotification('Produto criado com sucesso');
+        }
+        
+        // Recarrega os produtos
+        await productManager.loadProducts();
+        
+        // Fecha o modal
+        const modal = document.getElementById('product-modal');
+        modal.style.display = 'none';
+        
+        // Atualiza a tabela
+        await loadProducts();
+    } catch (error) {
+        console.error('Erro ao salvar produto:', error);
+        showNotification('Erro ao salvar produto', 'error');
+    }
+}
+
+/**
+ * Confirma a exclusão de um produto
+ */
+function confirmDeleteProduct(productId) {
+    const product = productManager.getProductById(productId);
+    if (!product) return;
+    
+    openConfirmModal(
+        `Deseja excluir o produto "${product.name}"?`,
+        () => deleteProduct(productId)
+    );
+}
+
+/**
+ * Exclui um produto
+ */
+async function deleteProduct(productId) {
+    try {
+        // Exclui o produto através da API
+        await window.api.deleteProduct(productId);
+        
+        // Recarrega os produtos
+        await productManager.loadProducts();
+        
+        // Atualiza a tabela
+        await loadProducts();
+        
+        showNotification('Produto excluído com sucesso');
+    } catch (error) {
+        console.error('Erro ao excluir produto:', error);
+        showNotification('Erro ao excluir produto', 'error');
+    }
+}
+
+/**
+ * Inicializa o upload de imagens
+ */
+function initImageUpload() {
+    const imageInputs = document.querySelectorAll('input[type="file"][accept="image/*"]');
+    
+    imageInputs.forEach(input => {
+        input.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const preview = document.getElementById(`${input.id}-preview`);
+            if (preview) {
+                preview.src = URL.createObjectURL(file);
+                preview.style.display = 'block';
+            }
+        });
+    });
+}
+
+/**
+ * Processa o upload de uma imagem
+ */
+async function handleImageUpload(file) {
+    try {
+        // Usar a API para fazer upload da imagem para o servidor
+        const imagePath = await window.api.uploadImage(file);
+        return imagePath;
+    } catch (error) {
+        console.error('Erro ao fazer upload da imagem:', error);
+        showNotification('Erro ao enviar imagem', 'error');
+        throw error;
+    }
+}
+
+/**
+ * Inicializa os modais
+ */
+function initModals() {
+    // Configura o fechamento dos modais
+    const modals = document.querySelectorAll('.modal');
+    
+    modals.forEach(modal => {
+        const closeBtn = modal.querySelector('.close');
+        if (closeBtn) {
+            closeBtn.onclick = () => {
+                modal.style.display = 'none';
+            };
+        }
+        
+        // Fecha ao clicar fora do modal
+        window.onclick = (event) => {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        };
+    });
+    
+    // Configura os formulários
+    const categoryForm = document.getElementById('category-form');
+    if (categoryForm) {
+        categoryForm.onsubmit = saveCategory;
+    }
+    
+    const productForm = document.getElementById('product-form');
+    if (productForm) {
+        productForm.onsubmit = saveProduct;
+    }
+    
+    const carouselForm = document.getElementById('carousel-form');
+    if (carouselForm) {
+        carouselForm.onsubmit = saveCarouselItem;
+    }
+}
+
+/**
+ * Abre o modal de confirmação
+ */
+function openConfirmModal(message, onConfirm) {
+    const modal = document.getElementById('confirm-modal');
+    const messageElement = modal.querySelector('.confirm-message');
+    const confirmButton = modal.querySelector('.confirm-button');
+    
+    messageElement.textContent = message;
+    
+    confirmButton.onclick = () => {
+        onConfirm();
+        modal.style.display = 'none';
+    };
+    
+    modal.style.display = 'block';
+}
+
+/**
+ * Exibe uma notificação
+ */
+function showNotification(message, type = 'success') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.classList.add('show');
+    }, 10);
+    
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => {
+            document.body.removeChild(notification);
+        }, 300);
+    }, 3000);
+}
+
+/**
+ * Formata um preço para exibição
+ */
+function formatPrice(price) {
+    return price.toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+    });
+}
+
+/**
+ * Inicializa a seção do carrossel
+ */
+async function initCarouselSection() {
+    const mainContent = document.getElementById('main-content');
+    
+    // Cria o HTML da seção com mensagem de carregamento
+    mainContent.innerHTML = `
+        <div class="section-header">
+            <button class="add-button" onclick="openCarouselModal()">
+                <i class="fas fa-plus"></i> Nova Imagem
+            </button>
+        </div>
+        <div class="carousel-items-container">
+            <div id="carousel-items">
+                <p class="loading-message">Carregando itens do carrossel...</p>
+            </div>
+        </div>
+    `;
+    
+    try {
+        await loadCarouselItems();
+        const items = JSON.parse(localStorage.getItem('carousel') || '[]');
+        
+        if (items.length === 0) {
+            document.getElementById('carousel-items').innerHTML = 
+                '<p class="empty-message">Nenhum item no carrossel. Clique em "Nova Imagem" para adicionar.</p>';
+        }
+    } catch (error) {
+        console.error('Erro ao inicializar carrossel:', error);
+        showNotification('Erro ao carregar o carrossel', 'error');
+    }
+}
+
+/**
+ * Carrega os itens do carrossel
+ */
+async function loadCarouselItems() {
+    const container = document.getElementById('carousel-items');
+    if (!container) return;
+    
+    try {
+        // Mostrar indicador de carregamento
+        container.innerHTML = '<p class="loading-message">Carregando itens do carrossel...</p>';
+        
+        // Obter slides da API
+        const slides = await window.api.getCarouselSlides();
+        
+        // Ordenar slides por ordem
+        slides.sort((a, b) => (a.order || 0) - (b.order || 0));
+        
+        // Verificar se há slides
+        if (!slides || slides.length === 0) {
+            container.innerHTML = '<p class="empty-message">Nenhum item no carrossel. Clique em "Nova Imagem" para adicionar.</p>';
+            return;
+        }
+        
+        // Limpar container
+        container.innerHTML = '';
+        
+        // Renderizar cada slide
+        slides.forEach((slide, index) => {
+            const itemElement = document.createElement('div');
+            itemElement.className = 'carousel-item-card';
+            
+            // Tratar o caminho da imagem
+            let imageUrl = slide.image;
+            
+            // Substituir referências de via.placeholder.com para placehold.co
+            if (imageUrl && imageUrl.includes('via.placeholder.com')) {
+                imageUrl = imageUrl.replace('via.placeholder.com', 'placehold.co');
+            }
+            
+            // Garantir que o caminho da imagem seja absoluto
+            if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('/')) {
+                imageUrl = '/' + imageUrl;
+            }
+            
+            itemElement.innerHTML = `
+                <div class="carousel-item-preview">
+                    <img src="${imageUrl}" alt="${slide.title}" class="carousel-thumbnail" onerror="this.src='https://placehold.co/600x400/cccccc/969696?text=Imagem+não+encontrada'">
+                    <div class="carousel-item-overlay">
+                        <h3>${slide.title || 'Sem título'}</h3>
+                        <p>${slide.subtitle || ''}</p>
+                    </div>
+                </div>
+                <div class="carousel-item-actions">
+                    <button class="move-btn" onclick="moveCarouselItem(${index}, -1)" ${index === 0 ? 'disabled' : ''}>
+                        <i class="fas fa-arrow-up"></i>
+                    </button>
+                    <button class="move-btn" onclick="moveCarouselItem(${index}, 1)" ${index === slides.length - 1 ? 'disabled' : ''}>
+                        <i class="fas fa-arrow-down"></i>
+                    </button>
+                    <button class="edit-btn" onclick="openCarouselModal(${index})">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="delete-btn" onclick="confirmDeleteCarouselItem(${index})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            
+            container.appendChild(itemElement);
+        });
+    } catch (error) {
+        console.error('Erro ao carregar itens do carrossel:', error);
+        container.innerHTML = '<p class="error-message">Erro ao carregar itens do carrossel. Tente novamente mais tarde.</p>';
+    }
+}
+
+/**
+ * Abre o modal de item do carrossel
+ */
+function openCarouselModal(index = null) {
+    const modal = document.getElementById('carousel-modal');
+    const form = document.getElementById('carousel-form');
+    const titleElement = modal.querySelector('.modal-title');
+    
+    if (!modal || !form || !titleElement) {
+        console.error('Elementos do modal não encontrados');
+        return;
+    }
+    
+    // Reset form
+    form.reset();
+    
+    let slide = null;
+    
+    if (index !== null) {
+        // Edit existing item
+        titleElement.textContent = 'Editar Item do Carrossel';
+        
+        const slides = JSON.parse(localStorage.getItem('carouselSlides') || '[]');
+        const items = JSON.parse(localStorage.getItem('carousel') || '[]');
+        
+        if (index >= 0 && index < items.length) {
+            const item = items[index];
+            
+            if (item.slideId) {
+                slide = slides.find(s => s.id === item.slideId);
+            }
+            
+            if (slide) {
+                // Usar hidden inputs para armazenar valores
+                const indexInput = document.createElement('input');
+                indexInput.type = 'hidden';
+                indexInput.id = 'carousel-index';
+                indexInput.name = 'index';
+                indexInput.value = index;
+                
+                const slideIdInput = document.createElement('input');
+                slideIdInput.type = 'hidden';
+                slideIdInput.id = 'carousel-slide-id';
+                slideIdInput.name = 'slideId';
+                slideIdInput.value = slide.id;
+                
+                // Adicionar inputs ao formulário
+                form.appendChild(indexInput);
+                form.appendChild(slideIdInput);
+                
+                // Preencher campos visíveis
+                document.getElementById('carousel-title').value = item.title || slide.title || '';
+                document.getElementById('carousel-description').value = item.description || slide.subtitle || '';
+                document.getElementById('carousel-link').value = item.link || slide.buttonLink || '';
+                
+                // Modificar imageUrl para usar placehold.co em vez de via.placeholder.com
+                let imageUrl = slide.image;
+                if (imageUrl && imageUrl.includes('via.placeholder.com')) {
+                    imageUrl = imageUrl.replace('via.placeholder.com', 'placehold.co');
+                }
+                
+                const previewImage = document.getElementById('carousel-image-preview');
+                if (previewImage) {
+                    previewImage.src = imageUrl;
+                    previewImage.style.display = 'block';
+                }
+            }
+        }
+    } else {
+        // Add new item
+        titleElement.textContent = 'Adicionar Item ao Carrossel';
+        
+        // Limpar inputs ocultos caso existam
+        const oldIndex = document.getElementById('carousel-index');
+        const oldSlideId = document.getElementById('carousel-slide-id');
+        if (oldIndex) oldIndex.remove();
+        if (oldSlideId) oldSlideId.remove();
+        
+        // Default image preview with placehold.co
+        const defaultImageUrl = 'https://placehold.co/1920x500/4a90e2/ffffff?text=Nova+Imagem';
+        
+        const previewImage = document.getElementById('carousel-image-preview');
+        if (previewImage) {
+            previewImage.src = defaultImageUrl;
+            previewImage.style.display = 'block';
+        }
+    }
+    
+    // Show modal
+    modal.style.display = 'block';
+}
+
+/**
+ * Salva um item do carrossel
+ */
+async function saveCarouselItem(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const title = document.getElementById('carousel-title').value.trim();
+    const description = document.getElementById('carousel-description').value.trim();
+    const linkUrl = document.getElementById('carousel-link').value.trim();
+    const imageInput = document.getElementById('carousel-image');
+    
+    // Obter valores dos inputs ocultos, se existirem
+    const indexInput = document.getElementById('carousel-index');
+    const slideIdInput = document.getElementById('carousel-slide-id');
+    const index = indexInput ? parseInt(indexInput.value) : null;
+    const slideId = slideIdInput ? slideIdInput.value : Date.now().toString();
+    
+    // Validação básica
+    if (!title) {
+        showNotification('O título é obrigatório', 'error');
+        return;
+    }
+    
+    // Verificar se há uma imagem no modo de criação
+    if (index === null && !imageInput.files.length) {
+        showNotification('A imagem é obrigatória para novos itens', 'error');
+        return;
+    }
+    
+    try {
+        console.log('Processando item do carrossel...');
+        
+        // Preparar dados do slide
+        const slideData = {
+            title: title,
+            subtitle: description,
+            buttonText: '',
+            buttonLink: linkUrl,
+            order: index !== null ? index + 1 : 99 // Ordem temporária
+        };
+        
+        // Se tem id existente, incluir no objeto
+        if (slideId) {
+            slideData.id = slideId;
+        }
+        
+        // Processar imagem se houver uma nova
+        if (imageInput.files.length > 0) {
+            try {
+                console.log('Fazendo upload de nova imagem...');
+                const imagePath = await window.api.uploadImage(imageInput.files[0]);
+                slideData.image = imagePath;
+                console.log('Upload de imagem concluído:', imagePath);
+            } catch (error) {
+                console.error('Erro ao fazer upload da imagem:', error);
+                showNotification('Erro ao enviar imagem. Tente novamente.', 'error');
+                return;
+            }
+        }
+        
+        // Salvar via API
+        try {
+            if (index !== null) {
+                // Atualizar slide existente
+                console.log('Atualizando slide existente:', slideData);
+                await window.api.updateSlide(slideData);
+            } else {
+                // Adicionar novo slide
+                console.log('Adicionando novo slide:', slideData);
+                await window.api.addSlide(slideData);
+            }
+            
+            // Fecha o modal
+            const modal = document.getElementById('carousel-modal');
+            modal.style.display = 'none';
+            
+            // Atualiza a lista
+            await loadCarouselItems();
+            
+            showNotification(index !== null ? 'Item atualizado com sucesso' : 'Item adicionado com sucesso');
+        } catch (error) {
+            console.error('Erro ao salvar no servidor:', error);
+            showNotification('Erro ao salvar no servidor', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao processar item do carrossel:', error);
+        showNotification('Erro ao processar item', 'error');
+    }
+}
+
+/**
+ * Exclui um item do carrossel
+ */
+async function deleteCarouselItem(index) {
+    try {
+        console.log(`Excluindo item do carrossel no índice ${index}...`);
+        
+        // Obtém os dados atuais
+        const slides = await window.api.getCarouselSlides();
+        
+        // Verifica se o índice é válido
+        if (index < 0 || index >= slides.length) {
+            console.error(`Índice inválido: ${index}`);
+            showNotification('Erro ao excluir item: índice inválido', 'error');
+            return;
+        }
+        
+        // Obtém o ID do slide a ser removido
+        const slideId = slides[index].id;
+        
+        // Exclui o slide através da API
+        await window.api.deleteSlide(slideId);
+        console.log(`Slide ID ${slideId} removido com sucesso`);
+        
+        // Atualiza a lista
+        await loadCarouselItems();
+        
+        showNotification('Item excluído com sucesso');
+    } catch (error) {
+        console.error('Erro ao excluir item do carrossel:', error);
+        showNotification('Erro ao excluir item do carrossel', 'error');
+    }
+}
+
+/**
+ * Move um item do carrossel para cima ou para baixo
+ */
+async function moveCarouselItem(index, direction) {
+    try {
+        console.log(`Movendo item do carrossel no índice ${index} na direção ${direction}...`);
+        
+        // Obtém os dados atuais
+        let items = JSON.parse(localStorage.getItem('carousel') || '[]');
+        let slides = JSON.parse(localStorage.getItem('carouselSlides') || '[]');
+        
+        // Calcula o novo índice
+        const newIndex = index + direction;
+        
+        // Verifica se o movimento é válido
+        if (newIndex < 0 || newIndex >= items.length) {
+            console.warn(`Movimento inválido: índice ${index} para ${newIndex}`);
+            return;
+        }
+        
+        console.log(`Trocando item ${index} com item ${newIndex}`);
+        
+        // Troca os itens de posição
+        [items[index], items[newIndex]] = [items[newIndex], items[index]];
+        
+        // Atualiza a ordem dos slides correspondentes
+        const item1 = items[index];
+        const item2 = items[newIndex];
+        
+        if (item1.slideId && item2.slideId) {
+            console.log(`Atualizando ordem dos slides: ${item1.slideId} e ${item2.slideId}`);
+            
+            const slide1Index = slides.findIndex(s => s.id === item1.slideId);
+            const slide2Index = slides.findIndex(s => s.id === item2.slideId);
+            
+            if (slide1Index !== -1 && slide2Index !== -1) {
+                // Troca as ordens dos slides
+                const tempOrder = slides[slide1Index].order;
+                slides[slide1Index].order = slides[slide2Index].order;
+                slides[slide2Index].order = tempOrder;
+                
+                // Reordena todos os slides para garantir consistência
+                slides.sort((a, b) => a.order - b.order);
+                
+                // Atualiza as ordens para garantir sequência contínua
+                slides.forEach((slide, i) => {
+                    slide.order = i + 1;
+                });
+                
+                localStorage.setItem('carouselSlides', JSON.stringify(slides));
+                console.log('Ordem dos slides atualizada com sucesso');
+            } else {
+                console.warn(`Um ou ambos os slides não foram encontrados: ${slide1Index}, ${slide2Index}`);
+            }
+        } else {
+            console.warn('Um ou ambos os itens não têm slideId');
+        }
+        
+        // Salva no localStorage
+        localStorage.setItem('carousel', JSON.stringify(items));
+        console.log('Itens do carrossel atualizados com sucesso');
+        
+        // Atualiza a lista
+        await loadCarouselItems();
+        
+        showNotification('Item movido com sucesso');
+    } catch (error) {
+        console.error('Erro ao mover item do carrossel:', error);
+        showNotification('Erro ao mover item do carrossel', 'error');
+    }
+}
+
+/**
+ * Confirma a exclusão de um item do carrossel
+ */
+function confirmDeleteCarouselItem(index) {
+    const items = JSON.parse(localStorage.getItem('carousel') || '[]');
+    const item = items[index];
+    if (!item) return;
+    
+    openConfirmModal(
+        `Deseja excluir o item "${item.title}" do carrossel?`,
+        () => deleteCarouselItem(index)
+    );
+}
+
+// Adicionar a função que faltava
+async function initOrdersSection() {
+    console.log("Seção de pedidos inicializada");
+    const mainContent = document.getElementById('main-content');
+    mainContent.innerHTML = '<div class="section-message">Funcionalidade de pedidos em desenvolvimento.</div>';
+} 

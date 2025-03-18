@@ -1,0 +1,38 @@
+[
+    {
+        "name": "Solaris",
+        "description": "2dsadasd",
+        "price": 22,
+        "stock": 658,
+        "categoryId": "cat1",
+        "isNew": true,
+        "sale": true,
+        "salePrice": null,
+        "image": "img\/1742249552_Viktor-ARCANE.png",
+        "id": 3
+    },
+    {
+        "name": "Testezada",
+        "description": "asdsdsasddas",
+        "price": 22,
+        "stock": 14,
+        "categoryId": "cat1",
+        "isNew": true,
+        "sale": true,
+        "salePrice": null,
+        "image": "img\/1742249590_464575899_9189895314373527_8713395021501878976_n.jpg",
+        "id": 4
+    },
+    {
+        "name": "Testezadadd",
+        "description": "sasd",
+        "price": 22,
+        "stock": 19,
+        "categoryId": "cat4",
+        "isNew": true,
+        "sale": false,
+        "salePrice": null,
+        "image": "img\/1742250443_viktor-from-arcane.png",
+        "id": 5
+    }
+]

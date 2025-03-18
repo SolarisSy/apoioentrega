@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Página de Diagnóstico</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            margin-top: 0;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        button {
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #3a7bc8;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Página de Diagnóstico</h1>
+
+    <div class="card">
+        <h2>API Status</h2>
+        <div>
+            <button id="test-api">Testar Conexão API</button>
+            <div id="api-status"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Categorias</h2>
+        <div>
+            <button id="load-categories">Carregar Categorias</button>
+            <div id="categories-output"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Produtos</h2>
+        <div>
+            <button id="load-products">Carregar Produtos</button>
+            <div id="products-output"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Carrossel</h2>
+        <div>
+            <button id="load-carousel">Carregar Slides</button>
+            <div id="carousel-output"></div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        // Inicializa a API
+        const api = new ApiService('server');
+
+        // Testa conexão com a API
+        document.getElementById('test-api').addEventListener('click', async () => {
+            const output = document.getElementById('api-status');
+            try {
+                const response = await fetch('server/index.php');
+                if (response.ok) {
+                    const data = await response.json();
+                    output.innerHTML = `<pre>Conexão OK: ${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    output.innerHTML = `<div class="error">Erro: Status ${response.status}</div>`;
+                }
+            } catch (error) {
+                output.innerHTML = `<div class="error">Erro na conexão: ${error.message}</div>`;
+            }
+        });
+
+        // Carrega categorias
+        document.getElementById('load-categories').addEventListener('click', async () => {
+            const output = document.getElementById('categories-output');
+            try {
+                const categories = await api.getAllCategories();
+                output.innerHTML = `<pre>Categorias: ${JSON.stringify(categories, null, 2)}</pre>`;
+            } catch (error) {
+                output.innerHTML = `<div class="error">Erro ao carregar categorias: ${error.message}</div>`;
+            }
+        });
+
+        // Carrega produtos
+        document.getElementById('load-products').addEventListener('click', async () => {
+            const output = document.getElementById('products-output');
+            try {
+                const products = await api.getAllProducts();
+                output.innerHTML = `<pre>Produtos: ${JSON.stringify(products, null, 2)}</pre>`;
+            } catch (error) {
+                output.innerHTML = `<div class="error">Erro ao carregar produtos: ${error.message}</div>`;
+            }
+        });
+
+        // Carrega slides do carrossel
+        document.getElementById('load-carousel').addEventListener('click', async () => {
+            const output = document.getElementById('carousel-output');
+            try {
+                const slides = await api.getCarouselSlides();
+                output.innerHTML = `<pre>Slides: ${JSON.stringify(slides, null, 2)}</pre>`;
+            } catch (error) {
+                output.innerHTML = `<div class="error">Erro ao carregar slides: ${error.message}</div>`;
+            }
+        });
+    </script>
+</body>
+</html> 
