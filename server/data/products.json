@@ -2,37 +2,37 @@
     {
         "id": 1,
         "name": "Mochila para Entregador",
-        "description": "Mochila resistente ideal para entregas, com compartimentos térmicos",
-        "price": 149.90,
-        "stock": 25,
+        "description": "Mochila resistente ideal para entregas, com compartimentos t\u00e9rmicos",
+        "price": 149.9,
+        "stock": 22,
         "categoryId": "cat1",
         "isNew": true,
         "sale": false,
         "salePrice": null,
-        "image": "https://placehold.co/500x500/4a90e2/ffffff?text=Mochila+para+Entregador"
+        "image": "https:\/\/placehold.co\/500x500\/4a90e2\/ffffff?text=Mochila+para+Entregador"
     },
     {
         "id": 2,
-        "name": "Bag Térmica 45 Litros",
-        "description": "Bag térmica com capacidade de 45L, ideal para entregas de alimentos",
-        "price": 99.90,
+        "name": "Bag T\u00e9rmica 45 Litros",
+        "description": "Bag t\u00e9rmica com capacidade de 45L, ideal para entregas de alimentos",
+        "price": 99.9,
         "stock": 15,
         "categoryId": "cat1",
         "isNew": true,
         "sale": true,
-        "salePrice": 89.90,
-        "image": "https://placehold.co/500x500/f5a623/ffffff?text=Bag+Térmica+45L"
+        "salePrice": 89.9,
+        "image": "https:\/\/placehold.co\/500x500\/f5a623\/ffffff?text=Bag+T\u00e9rmica+45L"
     },
     {
         "id": 3,
         "name": "Capacete para Motociclista",
-        "description": "Capacete certificado com viseira de proteção UV",
-        "price": 189.90,
+        "description": "Capacete certificado com viseira de prote\u00e7\u00e3o UV",
+        "price": 189.9,
         "stock": 10,
         "categoryId": "cat2",
         "isNew": false,
         "sale": false,
         "salePrice": null,
-        "image": "https://placehold.co/500x500/28a745/ffffff?text=Capacete+Motociclista"
+        "image": "https:\/\/placehold.co\/500x500\/28a745\/ffffff?text=Capacete+Motociclista"
     }
-] 
+]
