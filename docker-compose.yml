@@ -12,17 +12,6 @@ services:
     restart: always
     environment:
       - APACHE_DOCUMENT_ROOT=/var/www/html
-      - APACHE_RUN_USER=www-data
-      - APACHE_RUN_GROUP=www-data
-    command: >
-      bash -c "
-        chown -R www-data:www-data /var/www/html &&
-        chmod -R 755 /var/www/html &&
-        find /var/www/html -type d -exec chmod 777 {} \; &&
-        find /var/www/html/server/data -type d -exec chmod 777 {} \; &&
-        find /var/www/html/server/data -type f -exec chmod 666 {} \; &&
-        apache2-foreground
-      "
     networks:
       - apoioentrega-network
 

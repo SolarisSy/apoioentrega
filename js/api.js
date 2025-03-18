@@ -5,9 +5,6 @@ class ApiService {
     constructor(baseUrl = 'server') {
         this.baseUrl = baseUrl;
         this.sessionId = this.getOrCreateSessionId();
-        // Tenta detectar se estamos em ambiente de produção
-        this.isProduction = window.location.hostname !== 'localhost' && 
-                           !window.location.hostname.includes('127.0.0.1');
     }
     
     /**
@@ -43,11 +40,6 @@ class ApiService {
         // Constrói a URL com os parâmetros
         let url = `${this.baseUrl}/${endpoint}`;
         
-        // Adiciona parâmetro para evitar cache
-        if (method === 'GET') {
-            params._nocache = new Date().getTime();
-        }
-        
         if (Object.keys(params).length > 0) {
             const queryParams = new URLSearchParams();
             for (const key in params) {
@@ -62,9 +54,7 @@ class ApiService {
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
-            },
-            // Usa credenciais para cookies e headers em ambientes de produção
-            credentials: this.isProduction ? 'include' : 'same-origin'
+            }
         };
         
         // Adiciona o corpo da requisição para métodos que aceitam dados
@@ -72,31 +62,9 @@ class ApiService {
             options.body = JSON.stringify(data);
         }
         
-        // Timeout para requisições
-        const TIMEOUT = 15000; // 15 segundos
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
-        options.signal = controller.signal;
-        
         try {
             // Realiza a requisição
             const response = await fetch(url, options);
-            clearTimeout(timeoutId);
-            
-            // Verifica se houve erro HTTP 403 Forbidden
-            if (response.status === 403) {
-                console.error(`Erro 403 Forbidden na requisição para ${endpoint}`);
-                
-                // Para produção, tenta recarregar a página uma vez
-                if (this.isProduction && !localStorage.getItem('attempted_reload')) {
-                    localStorage.setItem('attempted_reload', 'true');
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1000);
-                }
-                
-                throw new Error('Acesso proibido (403 Forbidden). Verifique as permissões do servidor.');
-            }
             
             // Verifica se a resposta é JSON
             const contentType = response.headers.get('content-type');
@@ -105,35 +73,20 @@ class ApiService {
                 
                 // Verifica se houve erro
                 if (!response.ok) {
-                    throw new Error(result.error || `Erro ${response.status}: ${response.statusText}`);
+                    throw new Error(result.error || 'Erro na requisição');
                 }
                 
                 return result;
             } else {
                 // Resposta não é JSON
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(errorText || `Erro ${response.status}: ${response.statusText}`);
+                    throw new Error('Erro na requisição');
                 }
                 
                 return await response.text();
             }
         } catch (error) {
-            clearTimeout(timeoutId);
-            
-            // Verifica se é erro de timeout
-            if (error.name === 'AbortError') {
-                console.error(`Requisição para ${endpoint} abortada após ${TIMEOUT/1000} segundos`);
-                throw new Error(`A requisição excedeu o tempo limite de ${TIMEOUT/1000} segundos. Verifique sua conexão e tente novamente.`);
-            }
-            
             console.error(`Erro na requisição para ${endpoint}:`, error);
-            
-            // Para melhorar a experiência do usuário, fornece mensagens mais amigáveis
-            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                throw new Error('Não foi possível conectar ao servidor. Verifique sua conexão com a internet.');
-            }
-            
             throw error;
         }
     }
@@ -297,7 +250,7 @@ class ApiService {
     
     /**
      * Atualiza a quantidade de um item no carrinho
-     * @param {string|number} id - ID do item
+     * @param {number} id - ID do item
      * @param {number} quantity - Nova quantidade
      * @returns {Promise<Object>} Resposta da API
      */
@@ -307,7 +260,7 @@ class ApiService {
     
     /**
      * Remove um item do carrinho
-     * @param {string|number} id - ID do item
+     * @param {number} id - ID do item
      * @returns {Promise<Object>} Resposta da API
      */
     async removeFromCart(id) {
@@ -321,7 +274,7 @@ class ApiService {
     async clearCart() {
         return this.request('cart.php', 'DELETE', null, { clear: 'true' });
     }
-
+    
     // Métodos específicos para o carrossel
     
     /**
@@ -334,7 +287,7 @@ class ApiService {
     
     /**
      * Obtém um slide pelo ID
-     * @param {string|number} id - ID do slide
+     * @param {number} id - ID do slide
      * @returns {Promise<Object>} Slide
      */
     async getSlideById(id) {
@@ -361,7 +314,7 @@ class ApiService {
     
     /**
      * Remove um slide
-     * @param {string|number} id - ID do slide
+     * @param {number} id - ID do slide
      * @returns {Promise<Object>} Resposta da API
      */
     async deleteSlide(id) {
@@ -379,62 +332,24 @@ class ApiService {
         
         const url = `${this.baseUrl}/upload.php`;
         
-        // Adiciona timeout para upload
-        const TIMEOUT = 30000; // 30 segundos para upload
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
-        
         try {
             const response = await fetch(url, {
                 method: 'POST',
-                body: formData,
-                signal: controller.signal,
-                credentials: this.isProduction ? 'include' : 'same-origin'
+                body: formData
             });
             
-            clearTimeout(timeoutId);
-            
-            // Verifica erro 403
-            if (response.status === 403) {
-                console.error('Erro 403 Forbidden no upload de imagem');
-                throw new Error('Acesso proibido (403 Forbidden). Verifique as permissões do servidor para upload.');
-            }
-            
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText || `Erro ${response.status} ao fazer upload da imagem`);
+                throw new Error('Erro ao fazer upload da imagem');
             }
             
             const result = await response.json();
             return result.imagePath;
         } catch (error) {
-            clearTimeout(timeoutId);
-            
-            // Verifica se é erro de timeout
-            if (error.name === 'AbortError') {
-                console.error(`Upload abortado após ${TIMEOUT/1000} segundos`);
-                throw new Error(`O upload excedeu o tempo limite de ${TIMEOUT/1000} segundos. A imagem pode ser muito grande.`);
-            }
-            
             console.error('Erro no upload da imagem:', error);
             throw error;
         }
     }
-
-    // Método para verificação de status do servidor
-    async checkServerStatus() {
-        try {
-            await this.request('index.php', 'GET');
-            return true;
-        } catch (error) {
-            console.error('Erro ao verificar status do servidor:', error);
-            return false;
-        }
-    }
 }
-
-// Exporta uma instância única para ser usada em toda a aplicação
-const Api = new ApiService();
 
 // Cria uma instância global da API
 const apiService = new ApiService();
