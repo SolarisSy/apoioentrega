@@ -4,8 +4,7 @@
   "description": "Plataforma Apoio Entrega",
   "main": "index.html",
   "scripts": {
-    "start": "node server.js",
-    "postinstall": "npm install --no-package-lock"
+    "start": "node server.js"
   },
   "engines": {
     "node": "18.x"
