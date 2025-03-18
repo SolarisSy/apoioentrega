@@ -3,20 +3,30 @@
  */
 class ApiService {
     constructor(baseUrl = 'server') {
+        // Verifica se já existe uma instância global para evitar duplicação
+        if (window.apiServiceInstance) {
+            console.log('Usando instância existente de ApiService');
+            return window.apiServiceInstance;
+        }
+        
         // Verifica se a aplicação está rodando no ambiente de produção ou local
         const isProduction = window.location.hostname !== 'localhost' && 
                             !window.location.hostname.includes('127.0.0.1');
         
         if (isProduction) {
-            // Em produção, usa a URL relativa
-            this.baseUrl = baseUrl;
+            // Em produção, usa a URL relativa sem o prefixo /server
+            this.baseUrl = '';
         } else {
-            // Em ambiente local, usa a URL completa do servidor local
+            // Em ambiente local, usa o baseUrl configurado
             this.baseUrl = baseUrl;
         }
         
         this.sessionId = this.getOrCreateSessionId();
-        this.defaultTimeout = 10000; // 10 segundos
+        this.defaultTimeout = 30000; // Aumentado para 30 segundos
+        this.pendingRequests = {}; // Para armazenar e cancelar requisições pendentes
+        
+        // Armazena globalmente para reutilizar
+        window.apiServiceInstance = this;
     }
     
     /**
@@ -48,28 +58,17 @@ class ApiService {
         // Simplificar a construção de URL para evitar problemas
         let url;
         
-        // Se o endpoint já for uma URL completa, usar diretamente
-        if (endpoint.startsWith('http')) {
-            url = new URL(endpoint);
+        // Construir URL completa
+        const isProduction = window.location.hostname !== 'localhost' && 
+                            !window.location.hostname.includes('127.0.0.1');
+        
+        if (isProduction) {
+            // Em produção, usar URL direta do domínio
+            url = new URL(`${window.location.origin}/${endpoint}`, window.location.origin);
         } else {
-            // Determinar se estamos em ambiente de produção
-            const isProduction = window.location.hostname !== 'localhost' && 
-                                !window.location.hostname.includes('127.0.0.1');
-            
-            if (isProduction) {
-                // Em produção, usar caminhos relativos ao domínio atual
-                const base = window.location.origin;
-                url = new URL(`${base}/${endpoint}`, base);
-            } else {
-                // Em ambiente local, usar o baseUrl configurado
-                const base = window.location.origin;
-                const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
-                const cleanBaseUrl = this.baseUrl.startsWith('/') ? this.baseUrl : `/${this.baseUrl}`;
-                const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-                
-                const fullPath = `${cleanBase}${cleanBaseUrl}${cleanEndpoint}`;
-                url = new URL(fullPath);
-            }
+            // Em desenvolvimento, incluir o caminho do servidor
+            const fullPath = `${window.location.origin}/${this.baseUrl}/${endpoint}`;
+            url = new URL(fullPath);
         }
         
         // Adicionar parâmetros à URL
@@ -81,10 +80,25 @@ class ApiService {
             });
         }
         
-        console.log(`Enviando requisição ${method} para: ${url.toString()}`);
+        const urlString = url.toString();
+        console.log(`Enviando requisição ${method} para: ${urlString}`);
         
+        // Cancelar requisições pendentes duplicadas (para o mesmo endpoint e método)
+        const requestKey = `${method}-${urlString}`;
+        if (this.pendingRequests[requestKey]) {
+            console.log(`Cancelando requisição anterior para ${requestKey}`);
+            this.pendingRequests[requestKey].abort();
+        }
+        
+        // Criar novo controlador para esta requisição
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), this.defaultTimeout);
+        this.pendingRequests[requestKey] = controller;
+        
+        // Configura o tempo limite
+        const timeoutId = setTimeout(() => {
+            console.warn(`Tempo limite excedido para ${urlString}, abortando...`);
+            controller.abort();
+        }, this.defaultTimeout);
         
         try {
             const options = {
@@ -105,8 +119,11 @@ class ApiService {
                 console.log(`Dados enviados no ${method}:`, JSON.stringify(data));
             }
             
-            const response = await fetch(url.toString(), options);
+            const response = await fetch(urlString, options);
+            
+            // Limpar o timeout e referência à requisição
             clearTimeout(timeoutId);
+            delete this.pendingRequests[requestKey];
             
             if (!response.ok) {
                 const errorMessage = `Erro na resposta: ${response.status} ${response.statusText}`;
@@ -138,8 +155,11 @@ class ApiService {
                 }
             }
         } catch (error) {
+            // Limpar o timeout e referência à requisição
             clearTimeout(timeoutId);
-            console.error(`Erro na requisição para ${url.toString()} (${method}):`, error);
+            delete this.pendingRequests[requestKey];
+            
+            console.error(`Erro na requisição para ${urlString} (${method}):`, error);
             
             // Fornece mensagem de erro mais detalhada
             if (error.name === 'AbortError') {
@@ -158,10 +178,10 @@ class ApiService {
      */
     async ensureArray(requestFn, fallbackData = []) {
         try {
-            const result = await requestFn();
+            const result = await this.requestWithRetry(requestFn, 2);
             return Array.isArray(result) ? result : [];
         } catch (error) {
-            console.error('Erro ao obter dados:', error);
+            console.error('Erro ao obter dados, usando fallback:', error);
             return fallbackData;
         }
     }
@@ -170,9 +190,16 @@ class ApiService {
     
     /**
      * Obtém todos os produtos
+     * @param {boolean} useCache - Se deve usar cache quando disponível
      * @returns {Promise<Array>} Lista de produtos
      */
-    async getAllProducts() {
+    async getAllProducts(useCache = true) {
+        // Verifica se temos produtos em cache e se devemos usá-los
+        if (useCache && this.productsCache) {
+            console.log('Usando produtos em cache');
+            return this.productsCache;
+        }
+        
         const fallbackProducts = [
             {
                 id: 1,
@@ -212,7 +239,22 @@ class ApiService {
             }
         ];
         
-        return this.ensureArray(() => this.request('products.php'), fallbackProducts);
+        try {
+            const products = await this.requestWithRetry(
+                () => this.request('products.php'),
+                2
+            );
+            
+            if (Array.isArray(products) && products.length > 0) {
+                // Armazena no cache
+                this.productsCache = products;
+                return products;
+            }
+            return fallbackProducts;
+        } catch (error) {
+            console.error('Erro ao obter produtos, usando fallback:', error);
+            return fallbackProducts;
+        }
     }
     
     /**
@@ -248,7 +290,15 @@ class ApiService {
      * @returns {Promise<Object>} Produto adicionado
      */
     async addProduct(product) {
-        return this.request('products.php', 'POST', product);
+        try {
+            const result = await this.request('products.php', 'POST', product);
+            // Limpa o cache após adicionar um produto
+            this.clearProductsCache();
+            return result;
+        } catch (error) {
+            console.error('Erro ao adicionar produto:', error);
+            throw error;
+        }
     }
     
     /**
@@ -257,7 +307,15 @@ class ApiService {
      * @returns {Promise<Object>} Produto atualizado
      */
     async updateProduct(product) {
-        return this.request('products.php', 'PUT', product);
+        try {
+            const result = await this.request('products.php', 'PUT', product);
+            // Limpa o cache após atualizar um produto
+            this.clearProductsCache();
+            return result;
+        } catch (error) {
+            console.error('Erro ao atualizar produto:', error);
+            throw error;
+        }
     }
     
     /**
@@ -266,22 +324,60 @@ class ApiService {
      * @returns {Promise<Object>} Resposta da API
      */
     async deleteProduct(id) {
-        return this.request('products.php', 'DELETE', null, { id });
+        try {
+            const result = await this.request('products.php', 'DELETE', null, { id });
+            // Limpa o cache após remover um produto
+            this.clearProductsCache();
+            return result;
+        } catch (error) {
+            console.error('Erro ao excluir produto:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Limpa o cache de produtos
+     */
+    clearProductsCache() {
+        console.log('Limpando cache de produtos');
+        this.productsCache = null;
+    }
+    
+    /**
+     * Limpa todos os caches
+     */
+    clearAllCaches() {
+        this.clearCategoriesCache();
+        this.clearProductsCache();
     }
     
     // Métodos específicos para categorias
     
     /**
      * Obtém todas as categorias
+     * @param {boolean} useCache - Se deve usar cache quando disponível
      * @returns {Promise<Array>} Lista de categorias
      */
-    async getAllCategories() {
+    async getAllCategories(useCache = true) {
+        // Verifica se temos categorias em cache e se devemos usá-las
+        if (useCache && this.categoriesCache) {
+            console.log('Usando categorias em cache');
+            return this.categoriesCache;
+        }
+        
         try {
-            // Adiciona parâmetro de timestamp para evitar cache
+            // Adiciona parâmetro de timestamp para evitar cache do navegador
             const timestamp = Date.now();
-            const apiCategories = await this.request('categories.php', 'GET', null, { timestamp });
+            
+            const apiCategories = await this.requestWithRetry(
+                () => this.request('categories.php', 'GET', null, { timestamp }),
+                3 // 3 tentativas
+            );
             
             if (Array.isArray(apiCategories) && apiCategories.length > 0) {
+                // Armazena no cache da instância
+                this.categoriesCache = apiCategories;
+                
                 // Armazena no localStorage apenas para fallback, não como fonte primária
                 try {
                     localStorage.setItem('localCategories', JSON.stringify(apiCategories));
@@ -405,13 +501,18 @@ class ApiService {
             
             // Faz a requisição POST
             try {
-                const result = await this.request('categories.php', 'POST', categoryData, {}, headers);
+                const result = await this.requestWithRetry(
+                    () => this.request('categories.php', 'POST', categoryData, {}, headers),
+                    3 // 3 tentativas
+                );
                 
                 console.log('Categoria adicionada com sucesso:', result);
                 
-                // Força recarregamento de categorias após adicionar
+                // Limpa o cache após adicionar uma categoria
+                this.clearCategoriesCache();
+                
+                // Dispara evento de atualização
                 setTimeout(() => {
-                    // Disparar evento de atualização
                     window.dispatchEvent(new CustomEvent('categories-updated', {
                         detail: { action: 'add', category: result }
                     }));
@@ -443,11 +544,16 @@ class ApiService {
                 'Expires': '0'
             };
             
-            const result = await this.request('categories.php', 'PUT', {...category, timestamp}, {}, headers);
+            const result = await this.requestWithRetry(
+                () => this.request('categories.php', 'PUT', {...category, timestamp}, {}, headers),
+                3 // 3 tentativas
+            );
             
-            // Força recarregamento de categorias após atualizar
+            // Limpa o cache após atualizar uma categoria
+            this.clearCategoriesCache();
+            
+            // Dispara evento de atualização
             setTimeout(() => {
-                // Disparar evento de atualização
                 window.dispatchEvent(new CustomEvent('categories-updated', {
                     detail: { action: 'update', category: result }
                 }));
@@ -455,7 +561,7 @@ class ApiService {
             
             return result;
         } catch (error) {
-            console.warn('Erro ao atualizar categoria:', error);
+            console.error('Erro ao atualizar categoria:', error);
             throw error;
         }
     }
@@ -489,13 +595,18 @@ class ApiService {
                 'Expires': '0'
             };
             
-            const result = await this.request('categories.php', 'DELETE', null, params, headers);
+            const result = await this.requestWithRetry(
+                () => this.request('categories.php', 'DELETE', null, params, headers),
+                3 // 3 tentativas
+            );
             
             console.log(`Categoria excluída com sucesso: ${id}`, result);
             
-            // Força recarregamento de categorias após deletar
+            // Limpa o cache após excluir uma categoria
+            this.clearCategoriesCache();
+            
+            // Dispara evento de atualização
             setTimeout(() => {
-                // Disparar evento de atualização
                 window.dispatchEvent(new CustomEvent('categories-updated', {
                     detail: { action: 'delete', categoryId: id }
                 }));
@@ -629,38 +740,90 @@ class ApiService {
         
         console.log(`Tentando fazer upload para: ${uploadUrl}`);
         
-        try {
+        // Usar o mecanismo de retry para uploads
+        return this.requestWithRetry(async () => {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos para upload
-            
-            const response = await fetch(uploadUrl, {
-                method: 'POST',
-                body: formData,
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error(`Erro no upload (${response.status}): ${errorText}`);
-                throw new Error('Erro ao fazer upload da imagem');
-            }
+            const timeoutId = setTimeout(() => {
+                console.warn(`Tempo limite excedido para upload, abortando...`);
+                controller.abort();
+            }, 60000); // 60 segundos para upload, que pode demorar mais
             
             try {
-                const result = await response.json();
-                console.log('Upload realizado com sucesso:', result);
-                return result.imagePath;
-            } catch (jsonError) {
-                console.error('Erro ao analisar resposta JSON do upload:', jsonError);
-                const text = await response.text();
-                console.log('Resposta em texto:', text);
-                throw new Error('Erro ao processar resposta do servidor após upload');
+                const response = await fetch(uploadUrl, {
+                    method: 'POST',
+                    body: formData,
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`Erro no upload (${response.status}): ${errorText}`);
+                    throw new Error(`Erro ao fazer upload da imagem: ${response.status}`);
+                }
+                
+                const contentType = response.headers.get('Content-Type');
+                if (contentType && contentType.includes('application/json')) {
+                    const result = await response.json();
+                    console.log('Upload realizado com sucesso:', result);
+                    return result.imagePath;
+                } else {
+                    const text = await response.text();
+                    console.log('Resposta em texto do upload:', text);
+                    
+                    // Tenta extrair o caminho da imagem da resposta
+                    try {
+                        const result = JSON.parse(text);
+                        return result.imagePath;
+                    } catch (jsonError) {
+                        throw new Error('Resposta do servidor não contém dados válidos');
+                    }
+                }
+            } catch (error) {
+                clearTimeout(timeoutId);
+                console.error('Erro no upload da imagem:', error);
+                throw error;
             }
-        } catch (error) {
-            console.error('Erro no upload da imagem:', error);
-            throw error;
+        }, 3); // Tenta até 3 vezes
+    }
+    
+    /**
+     * Realiza uma requisição com até X tentativas em caso de erro
+     * @param {Function} requestFn - Função que realiza a requisição
+     * @param {number} maxRetries - Número máximo de tentativas
+     * @param {number} delay - Delay entre tentativas em ms
+     * @returns {Promise<any>} - Resultado da requisição
+     */
+    async requestWithRetry(requestFn, maxRetries = 3, delay = 1000) {
+        let lastError;
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                return await requestFn();
+            } catch (error) {
+                lastError = error;
+                
+                // Se for o último retry, não precisa esperar
+                if (attempt < maxRetries) {
+                    console.log(`Tentativa ${attempt} falhou, tentando novamente em ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    // Aumenta o delay a cada tentativa (backoff exponencial)
+                    delay *= 1.5;
+                }
+            }
         }
+        
+        console.error(`Todas as ${maxRetries} tentativas falharam`);
+        throw lastError;
+    }
+    
+    /**
+     * Limpa o cache de categorias
+     */
+    clearCategoriesCache() {
+        console.log('Limpando cache de categorias');
+        this.categoriesCache = null;
     }
 }
 

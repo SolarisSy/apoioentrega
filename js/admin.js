@@ -3,11 +3,7 @@
  * Versão 2.0
  */
 
-// Inicializa o serviço de API
-if (typeof window.api === 'undefined' && typeof ApiService !== 'undefined') {
-    window.api = new ApiService('server');
-}
-
+// Document Ready
 document.addEventListener('DOMContentLoaded', async function() {
     // Adicionar estilos para a mensagem de funcionalidade em desenvolvimento
     const style = document.createElement('style');
@@ -32,6 +28,27 @@ document.addEventListener('DOMContentLoaded', async function() {
  * Inicializa o painel administrativo
  */
 async function initAdmin() {
+    console.log('Inicializando painel administrativo...');
+    
+    // Garantir que o ApiService está inicializado
+    if (!window.api || !window.apiService) {
+        console.log('Inicializando ApiService...');
+        window.api = new ApiService();
+        window.apiService = window.api;
+    }
+    
+    // Garantir que o CategoryManager está inicializado
+    if (!window.categoryManager) {
+        console.log('Inicializando CategoryManager...');
+        window.categoryManager = new CategoryManager();
+    }
+    
+    // Garantir que o ProductManager está inicializado
+    if (!window.productManager) {
+        console.log('Inicializando ProductManager...');
+        window.productManager = new ProductManager();
+    }
+    
     // Inicializa os componentes principais
     initSidebar();
     initModals();
@@ -269,6 +286,7 @@ async function loadSection(sectionId) {
  * Inicializa a seção de produtos
  */
 async function initProductsSection() {
+    console.log('Inicializando seção de produtos...');
     const mainContent = document.getElementById('main-content');
     
     // Cria o HTML da seção
@@ -284,8 +302,8 @@ async function initProductsSection() {
                 </select>
             </div>
         </div>
-        <div class="table-container">
-            <table id="products-table">
+        <div class="products-container">
+            <table id="products-table" class="data-table">
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -297,46 +315,94 @@ async function initProductsSection() {
                         <th>Ações</th>
                     </tr>
                 </thead>
-                <tbody></tbody>
+                <tbody>
+                    <tr>
+                        <td colspan="7" class="loading-message">Carregando produtos...</td>
+                    </tr>
+                </tbody>
             </table>
         </div>
     `;
     
-    // Inicializa os componentes
-    await loadProducts();
-    initProductSearch();
+    // Inicializa o filtro de categorias
     updateCategoryFilter();
+    
+    // Inicializa a busca
+    initProductSearch();
+    
+    try {
+        // Carrega os produtos de forma assíncrona
+        loadProducts().catch(error => {
+            console.error('Erro ao carregar produtos:', error);
+            const tableBody = document.querySelector('#products-table tbody');
+            if (tableBody) {
+                tableBody.innerHTML = `<tr><td colspan="7" class="error-message">Erro ao carregar produtos: ${error.message}</td></tr>`;
+            }
+        });
+    } catch (error) {
+        console.error('Erro ao inicializar seção de produtos:', error);
+    }
 }
 
 /**
- * Carrega os produtos na tabela
+ * Carrega e renderiza os produtos
  */
 async function loadProducts() {
+    console.log('Carregando produtos...');
     const tableBody = document.querySelector('#products-table tbody');
-    if (!tableBody) return;
+    
+    if (!tableBody) {
+        console.error('Elemento #products-table tbody não encontrado');
+        return;
+    }
     
     try {
-        // Obtém os produtos
+        // Primeiro mostra uma mensagem de carregamento
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="7" class="loading-message">
+                    <i class="fas fa-spinner fa-spin"></i> Carregando produtos...
+                </td>
+            </tr>
+        `;
+        
+        // Carrega os produtos (com tentativas de retry incorporadas na API)
+        await productManager.loadProducts(false);
+        
+        // Renderiza os produtos
         const products = productManager.getAllProducts();
         
-        // Limpa a tabela
+        if (products.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="empty-message">Nenhum produto encontrado</td>
+                </tr>
+            `;
+            return;
+        }
+        
         tableBody.innerHTML = '';
         
-        // Adiciona cada produto
         products.forEach(product => {
             const row = document.createElement('tr');
             
             // Obtém o caminho da categoria
-            const categoryPath = product.categoryPath || productManager.getCategoryPathById(product.categoryId) || 'Sem categoria';
+            const categoryPath = product.categoryPath || 'Sem categoria';
+            
+            // Formata o preço
+            const price = formatPrice(product.price);
+            
+            // Monta a URL da imagem
+            const imageUrl = product.imageUrl || product.image || 'img/placeholder.jpg';
             
             row.innerHTML = `
                 <td>${product.id}</td>
                 <td>
-                    <img src="${product.imageUrl || product.image}" alt="${product.name}" class="product-thumbnail">
+                    <img src="${imageUrl}" alt="${product.name}" class="product-thumbnail">
                 </td>
                 <td>${product.name}</td>
                 <td>${categoryPath}</td>
-                <td>${formatPrice(product.price)}</td>
+                <td>${price}</td>
                 <td>${product.stock}</td>
                 <td>
                     <button class="edit-btn" onclick="openProductModal(${product.id})">
@@ -350,9 +416,17 @@ async function loadProducts() {
             
             tableBody.appendChild(row);
         });
+        
+        console.log('Produtos carregados com sucesso');
     } catch (error) {
         console.error('Erro ao carregar produtos:', error);
-        showNotification('Erro ao carregar produtos', 'error');
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="7" class="error-message">
+                    Erro ao carregar produtos: ${error.message}
+                </td>
+            </tr>
+        `;
     }
 }
 
@@ -360,6 +434,7 @@ async function loadProducts() {
  * Inicializa a seção de categorias
  */
 async function initCategoriesSection() {
+    console.log('Inicializando seção de categorias...');
     const mainContent = document.getElementById('main-content');
     
     // Cria o HTML da seção
@@ -370,35 +445,68 @@ async function initCategoriesSection() {
             </button>
         </div>
         <div class="categories-container">
-            <div id="categories-tree"></div>
+            <div id="categories-tree" class="loading">
+                <p class="loading-message"><i class="fas fa-spinner fa-spin"></i> Carregando categorias...</p>
+            </div>
         </div>
     `;
     
-    // Renderiza a árvore de categorias
-    await renderCategoriesTree();
+    try {
+        // Renderiza a árvore de categorias de forma assíncrona
+        renderCategoriesTree().catch(error => {
+            console.error('Erro ao renderizar árvore de categorias:', error);
+            const categoriesTree = document.getElementById('categories-tree');
+            if (categoriesTree) {
+                categoriesTree.classList.remove('loading');
+                categoriesTree.innerHTML = `<p class="error-message">Erro ao carregar categorias: ${error.message}</p>`;
+            }
+        });
+    } catch (error) {
+        console.error('Erro ao inicializar seção de categorias:', error);
+    }
 }
 
 /**
  * Renderiza a árvore de categorias
  */
 async function renderCategoriesTree() {
+    console.log('Renderizando árvore de categorias...');
     const container = document.getElementById('categories-tree');
-    if (!container) return;
+    
+    if (!container) {
+        console.error('Elemento #categories-tree não encontrado');
+        return;
+    }
     
     try {
+        // Certifica-se de que as categorias estão carregadas
+        await categoryManager.loadCategories(false);
+        
         // Obtém a hierarquia de categorias
         const hierarchy = categoryManager.getCategoryHierarchy();
+        console.log('Hierarquia de categorias:', hierarchy);
+        
+        // Remove a classe de carregamento
+        container.classList.remove('loading');
         
         // Limpa o container
         container.innerHTML = '';
+        
+        if (!hierarchy || hierarchy.length === 0) {
+            container.innerHTML = '<p class="empty-message">Nenhuma categoria encontrada.</p>';
+            return;
+        }
         
         // Renderiza cada categoria principal
         hierarchy.forEach(category => {
             container.appendChild(createCategoryNode(category));
         });
+        
+        console.log('Árvore de categorias renderizada com sucesso');
     } catch (error) {
         console.error('Erro ao renderizar categorias:', error);
-        showNotification('Erro ao carregar categorias', 'error');
+        container.classList.remove('loading');
+        container.innerHTML = `<p class="error-message">Erro ao carregar categorias: ${error.message}</p>`;
     }
 }
 

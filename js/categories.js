@@ -3,15 +3,16 @@
  * Versão 4.0
  */
 
-// Inicializa o serviço de API se ainda não foi inicializado
-if (typeof window.api === 'undefined' && typeof ApiService !== 'undefined') {
-    window.api = new ApiService('server');
-}
-
 class CategoryManager {
     constructor() {
+        // Usar a instância global de ApiService
+        if (!window.api) {
+            console.log('Inicializando ApiService a partir de CategoryManager');
+            window.api = new ApiService();
+        }
+        
+        this.api = window.api;
         this.categories = [];
-        this.api = new ApiService();
         
         // Adicionar listeners para eventos de atualização de categorias
         window.addEventListener('categories-updated', this.handleCategoriesUpdated.bind(this));
@@ -24,8 +25,10 @@ class CategoryManager {
     handleCategoriesUpdated(event) {
         const { action, category, categoryId } = event.detail;
         
+        console.log(`Evento categories-updated recebido: ${action}`, event.detail);
+        
         // Recarrega as categorias após qualquer alteração
-        this.loadCategories().then(() => {
+        this.loadCategories(false).then(() => {
             // Após recarregar, dispara evento para componentes atualizarem UI
             const refreshEvent = new CustomEvent('categories-refreshed', {
                 detail: { action, category, categoryId }
@@ -36,12 +39,13 @@ class CategoryManager {
     
     /**
      * Carrega as categorias da API
+     * @param {boolean} useCache - Se deve usar cache quando disponível
      * @returns {Promise<Array>} Lista de categorias
      */
-    async loadCategories() {
+    async loadCategories(useCache = true) {
         try {
             console.log('Iniciando carregamento das categorias...');
-            const categories = await this.api.getAllCategories();
+            const categories = await this.api.getAllCategories(useCache);
             
             console.log('Categorias recebidas da API:', categories);
             
@@ -255,126 +259,122 @@ class CategoryManager {
     }
 
     /**
-     * Obtém a hierarquia de categorias para exibição
-     * @returns {Array} Hierarquia de categorias
+     * Obtém a hierarquia de categorias (categorias principais e suas subcategorias)
+     * @returns {Array} Categorias em formato hierárquico
      */
     getCategoryHierarchy() {
-        try {
-            console.log('Método getCategoryHierarchy chamado. Total de categorias:', Array.isArray(this.categories) ? this.categories.length : 0);
-            
-            // Garantir que temos categorias para trabalhar
-            if (!Array.isArray(this.categories) || this.categories.length === 0) {
-                console.log('Nenhuma categoria válida encontrada, tentando recarregar...');
-                // Força um recarregamento imediato
-                this.loadCategories();
-                return []; // Retorna vazio por enquanto
-            }
-            
-            const mainCategories = this.getMainCategories();
-            console.log('Categorias principais encontradas:', mainCategories.length);
-            
-            // Se não houver categorias principais, retorna array vazio
-            if (!Array.isArray(mainCategories) || mainCategories.length === 0) {
-                return [];
-            }
-            
-            const hierarchy = mainCategories.map(category => ({
-                ...category,
-                subcategories: this.buildSubcategoryTree(category.id)
-            }));
-            
-            console.log('Hierarquia de categorias construída com sucesso');
-            return hierarchy;
-        } catch (error) {
-            console.error('Erro ao construir hierarquia de categorias:', error);
-            return [];
-        }
-    }
-
-    /**
-     * Constrói a árvore de subcategorias recursivamente
-     * @param {string|number} categoryId - ID da categoria pai
-     * @returns {Array} Árvore de subcategorias
-     */
-    buildSubcategoryTree(categoryId) {
-        if (categoryId === undefined || categoryId === null) {
-            return [];
-        }
-        
-        const subcategories = this.getSubcategories(categoryId);
-        
-        if (!Array.isArray(subcategories) || subcategories.length === 0) {
-            return [];
-        }
-        
-        return subcategories.map(category => ({
-            ...category,
-            subcategories: this.buildSubcategoryTree(category.id)
-        }));
-    }
-
-    /**
-     * Obtém lista de categorias em formato plano com indentação
-     * @returns {Array} Lista de categorias com informações de nível
-     */
-    getFlatCategories() {
-        const result = [];
-        
-        // Verificar se this.categories é um array válido
+        // Verificar se temos categorias
         if (!Array.isArray(this.categories) || this.categories.length === 0) {
-            console.warn('Tentativa de obter categorias planas sem categorias válidas');
-            return result;
+            console.warn('Array de categorias vazio ou inválido ao tentar obter hierarquia');
+            return [];
         }
         
-        const addSubcategories = (parentId, level, parentPath) => {
-            // Garantir que obtemos um array válido de subcategorias
-            const subcategories = this.getSubcategories(parentId);
-            
-            if (!Array.isArray(subcategories)) {
-                return;
+        // Cria um mapa de categorias por ID para acesso mais rápido
+        const categoriesMap = {};
+        this.categories.forEach(category => {
+            if (category && category.id) {
+                categoriesMap[category.id] = { ...category, subcategories: [] };
             }
-            
-            subcategories.forEach(category => {
-                if (!category || !category.name) {
-                    return; // Pula categorias inválidas
+        });
+        
+        // Estrutura as categorias em uma hierarquia
+        const hierarchy = [];
+        
+        // Primeiro passo: adicionar subcategorias aos seus pais
+        Object.values(categoriesMap).forEach(category => {
+            if (category.parentId && categoriesMap[category.parentId]) {
+                // Adiciona como subcategoria do pai
+                categoriesMap[category.parentId].subcategories.push(category);
+            } else if (!category.parentId) {
+                // É uma categoria principal
+                hierarchy.push(category);
+            } else {
+                // Tem parentId, mas o pai não existe - tratar como categoria principal
+                console.warn(`Categoria ${category.id} (${category.name}) tem parentId ${category.parentId}, mas o pai não existe. Tratando como categoria principal.`);
+                category.parentId = null;
+                hierarchy.push(category);
+            }
+        });
+        
+        // Ordena as categorias principais por nome
+        hierarchy.sort((a, b) => a.name.localeCompare(b.name));
+        
+        // Ordena as subcategorias por nome em cada categoria
+        const sortSubcategories = (categories) => {
+            categories.forEach(category => {
+                if (category.subcategories && category.subcategories.length > 0) {
+                    category.subcategories.sort((a, b) => a.name.localeCompare(b.name));
+                    sortSubcategories(category.subcategories);
                 }
-                
-                const categoryPath = parentPath ? `${parentPath} > ${category.name}` : category.name;
-                
-                result.push({
-                    ...category,
-                    level,
-                    indent: '—'.repeat(level),
-                    path: categoryPath
-                });
-                
-                // Adiciona subcategorias recursivamente
-                addSubcategories(category.id, level + 1, categoryPath);
             });
         };
         
-        // Adiciona categorias principais (nível 0)
-        const mainCategories = this.getMainCategories();
+        sortSubcategories(hierarchy);
         
-        if (Array.isArray(mainCategories)) {
-            mainCategories.forEach(category => {
-                if (!category || !category.name) {
-                    return; // Pula categorias inválidas
-                }
-                
-                result.push({
-                    ...category,
-                    level: 0,
-                    indent: '',
-                    path: category.name
-                });
-                
-                // Adiciona subcategorias recursivamente
-                addSubcategories(category.id, 1, category.name);
-            });
+        return hierarchy;
+    }
+
+    /**
+     * Obtém o caminho completo de uma categoria pelo ID (ex: "Eletrônicos > Smartphones")
+     * @param {string} categoryId - ID da categoria
+     * @returns {string} Caminho da categoria
+     */
+    getCategoryPathById(categoryId) {
+        if (!categoryId) return 'Sem categoria';
+        
+        // Verifica se temos categorias
+        if (!Array.isArray(this.categories) || this.categories.length === 0) {
+            return 'Categoria desconhecida';
         }
         
-        return result;
+        // Encontra a categoria pelo ID
+        const category = this.categories.find(cat => cat.id === categoryId);
+        if (!category) return 'Categoria desconhecida';
+        
+        // Se não tem pai, retorna apenas o nome
+        if (!category.parentId) return category.name;
+        
+        // Mapa para detectar ciclos
+        const visited = new Set();
+        
+        // Constrói o caminho recursivamente
+        const buildPath = (id) => {
+            // Proteção contra ciclos
+            if (visited.has(id)) {
+                console.warn(`Ciclo detectado na hierarquia de categorias ao processar ${id}`);
+                return null;
+            }
+            
+            visited.add(id);
+            
+            const cat = this.categories.find(c => c.id === id);
+            if (!cat) return null;
+            
+            if (cat.parentId) {
+                const parentPath = buildPath(cat.parentId);
+                return parentPath ? `${parentPath} > ${cat.name}` : cat.name;
+            }
+            
+            return cat.name;
+        };
+        
+        return buildPath(categoryId);
+    }
+
+    /**
+     * Obtém todas as categorias em formato plano com caminhos
+     * @returns {Array} Lista de categorias com caminhos
+     */
+    getFlatCategories() {
+        if (!Array.isArray(this.categories) || this.categories.length === 0) {
+            return [];
+        }
+        
+        // Cria uma cópia das categorias e adiciona o caminho a cada uma
+        return this.categories.map(category => ({
+            ...category,
+            path: this.getCategoryPathById(category.id)
+        }));
     }
 
     /**

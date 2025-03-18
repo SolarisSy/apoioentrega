@@ -1,68 +1,77 @@
 /**
- * Classe para gerenciar os produtos do e-commerce
+ * Sistema de Gerenciamento de Produtos
+ * Versão 3.0
  */
-
-// Inicializa o serviço de API se ainda não foi inicializado
-if (typeof window.api === 'undefined' && typeof ApiService !== 'undefined') {
-    window.api = new ApiService('server');
-}
 
 class ProductManager {
     constructor() {
+        // Usar a instância global de ApiService
+        if (!window.api) {
+            console.log('Inicializando ApiService a partir de ProductManager');
+            window.api = new ApiService();
+        }
+        
+        this.api = window.api;
         this.products = [];
-        this.loadProducts();
+        
+        // Adiciona listener para evento de atualização de categorias
+        window.addEventListener('categories-refreshed', this.handleCategoriesRefreshed.bind(this));
     }
-
+    
+    /**
+     * Manipula evento de atualização de categorias
+     */
+    handleCategoriesRefreshed() {
+        // Quando as categorias são atualizadas, atualiza os caminhos de categoria dos produtos
+        this.updateProductCategoryPaths();
+    }
+    
     /**
      * Carrega os produtos da API
+     * @param {boolean} useCache - Se deve usar cache quando disponível
+     * @returns {Promise<Array>} Lista de produtos
      */
-    async loadProducts() {
+    async loadProducts(useCache = true) {
         try {
-            // Carrega os produtos da API
-            const productsData = await window.api.getAllProducts();
+            console.log('Iniciando carregamento de produtos...');
+            const products = await this.api.getAllProducts(useCache);
             
-            // Garante que this.products seja sempre um array
-            this.products = Array.isArray(productsData) ? productsData : [];
-            
-            // Processa as imagens dos produtos
-            this.products.forEach(product => {
-                // Para URLs externas ou placeholders
-                if (!product.imageUrl) {
-                    product.imageUrl = product.image;
-                }
+            if (Array.isArray(products)) {
+                this.products = products;
                 
-                // Atualiza o caminho da categoria se o CategoryManager estiver disponível
-                this.updateProductCategoryPath(product);
-            });
-            
-            console.log(`Carregados ${this.products.length} produtos.`);
-            return this.products;
+                // Atualiza os caminhos de categoria
+                this.updateProductCategoryPaths();
+                
+                console.log(`${this.products.length} produtos carregados com sucesso`);
+                return this.products;
+            } else {
+                console.error('Lista de produtos inválida:', products);
+                return [];
+            }
         } catch (error) {
             console.error('Erro ao carregar produtos:', error);
-            this.products = [];
             return [];
         }
     }
-
+    
     /**
-     * Atualiza o caminho da categoria de um produto
-     * @param {Object} product - Produto a ser atualizado
+     * Atualiza os caminhos de categoria dos produtos
      */
-    updateProductCategoryPath(product) {
-        if (!product.categoryId) return;
-        
-        try {
-            // Verifica se o CategoryManager está disponível
-            if (typeof CategoryManager !== 'undefined' && window.categoryManager) {
-                const categoryPath = window.categoryManager.getCategoryPath(product.categoryId);
-                if (categoryPath) {
-                    product.categoryPath = categoryPath;
-                    console.log(`Caminho da categoria atualizado para o produto ${product.id}: ${categoryPath}`);
-                }
-            }
-        } catch (error) {
-            console.warn(`Erro ao atualizar caminho da categoria para o produto ${product.id}:`, error);
+    updateProductCategoryPaths() {
+        // Verifica se temos acesso ao categoryManager
+        if (!window.categoryManager) {
+            console.warn('CategoryManager não disponível para atualizar caminhos de categoria');
+            return;
         }
+        
+        // Para cada produto, adiciona o caminho da categoria
+        this.products.forEach(product => {
+            if (product.categoryId) {
+                product.categoryPath = window.categoryManager.getCategoryPathById(product.categoryId);
+            } else {
+                product.categoryPath = 'Sem categoria';
+            }
+        });
     }
 
     /**
