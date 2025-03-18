@@ -101,15 +101,16 @@ class ApiService {
     /**
      * Garante que o resultado seja um array
      * @param {Function} requestFn - Função de requisição que retorna uma Promise
+     * @param {Array} fallbackData - Dados de fallback para retornar em caso de erro
      * @returns {Promise<Array>} Array garantido, mesmo em caso de erro
      */
-    async ensureArray(requestFn) {
+    async ensureArray(requestFn, fallbackData = []) {
         try {
             const result = await requestFn();
             return Array.isArray(result) ? result : [];
         } catch (error) {
             console.error('Erro ao obter dados:', error);
-            return [];
+            return fallbackData;
         }
     }
     
@@ -120,7 +121,46 @@ class ApiService {
      * @returns {Promise<Array>} Lista de produtos
      */
     async getAllProducts() {
-        return this.ensureArray(() => this.request('products.php'));
+        const fallbackProducts = [
+            {
+                id: 1,
+                name: "Mochila para Entregador",
+                description: "Mochila resistente ideal para entregas, com compartimentos térmicos",
+                price: 149.90,
+                stock: 25,
+                categoryId: "cat1",
+                isNew: true,
+                sale: false,
+                salePrice: null,
+                image: "https://placehold.co/500x500/4a90e2/ffffff?text=Mochila+para+Entregador"
+            },
+            {
+                id: 2,
+                name: "Bag Térmica 45 Litros",
+                description: "Bag térmica com capacidade de 45L, ideal para entregas de alimentos",
+                price: 99.90,
+                stock: 15,
+                categoryId: "cat1",
+                isNew: true,
+                sale: true,
+                salePrice: 89.90,
+                image: "https://placehold.co/500x500/f5a623/ffffff?text=Bag+Térmica+45L"
+            },
+            {
+                id: 3,
+                name: "Capacete para Motociclista",
+                description: "Capacete certificado com viseira de proteção UV",
+                price: 189.90,
+                stock: 10,
+                categoryId: "cat2",
+                isNew: false,
+                sale: false,
+                salePrice: null,
+                image: "https://placehold.co/500x500/28a745/ffffff?text=Capacete+Motociclista"
+            }
+        ];
+        
+        return this.ensureArray(() => this.request('products.php'), fallbackProducts);
     }
     
     /**
@@ -184,7 +224,30 @@ class ApiService {
      * @returns {Promise<Array>} Lista de categorias
      */
     async getAllCategories() {
-        return this.ensureArray(() => this.request('categories.php'));
+        const fallbackCategories = [
+            {
+                id: "cat1",
+                name: "Bags e Mochilas",
+                parentId: null
+            },
+            {
+                id: "cat2",
+                name: "Equipamentos de Proteção",
+                parentId: null
+            },
+            {
+                id: "cat3",
+                name: "Acessórios",
+                parentId: null
+            },
+            {
+                id: "cat4",
+                name: "Peças e Componentes",
+                parentId: null
+            }
+        ];
+        
+        return this.ensureArray(() => this.request('categories.php'), fallbackCategories);
     }
     
     /**
@@ -219,7 +282,30 @@ class ApiService {
      * @returns {Promise<Object>} Categoria adicionada
      */
     async addCategory(category) {
-        return this.request('categories.php', 'POST', category);
+        try {
+            return await this.request('categories.php', 'POST', category);
+        } catch (error) {
+            console.warn('Erro ao adicionar categoria via API, usando fallback local:', error);
+            
+            // Fallback: simula adição local quando a API falha
+            const allCategories = await this.getAllCategories();
+            const newCategory = {
+                ...category,
+                id: 'cat' + (Date.now() % 10000), // Gera um ID único
+                createdAt: new Date().toISOString()
+            };
+            
+            // Tenta salvar no localStorage como fallback
+            try {
+                const localCategories = JSON.parse(localStorage.getItem('localCategories') || '[]');
+                localCategories.push(newCategory);
+                localStorage.setItem('localCategories', JSON.stringify(localCategories));
+            } catch (storageError) {
+                console.error('Erro ao salvar categoria no localStorage:', storageError);
+            }
+            
+            return newCategory;
+        }
     }
     
     /**
