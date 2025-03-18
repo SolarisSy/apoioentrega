@@ -445,15 +445,113 @@ function createCategoryNode(category, level = 0) {
 /**
  * Adiciona uma nova categoria
  */
-function addCategory(parentId = null) {
-    openCategoryModal(null, parentId);
+async function addCategory() {
+    // Abre um modal para adicionar categoria
+    const mainContent = document.getElementById('main-content');
+    
+    // Cria o modal se não existir
+    let modalElement = document.getElementById('category-modal');
+    if (!modalElement) {
+        modalElement = document.createElement('div');
+        modalElement.id = 'category-modal';
+        modalElement.className = 'modal';
+        
+        // Cria o conteúdo do modal
+        modalElement.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Nova Categoria</h2>
+                    <span class="close" onclick="document.getElementById('category-modal').style.display='none'">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <form id="category-form">
+                        <div class="form-group">
+                            <label for="newCategoryName">Nome da Categoria</label>
+                            <input type="text" id="newCategoryName" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="newCategoryParent">Categoria Pai</label>
+                            <select id="newCategoryParent" name="parentId">
+                                <option value="null">Nenhuma (Categoria Principal)</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" onclick="saveCategory()" class="save-btn">Salvar</button>
+                            <button type="button" class="cancel-btn" onclick="document.getElementById('category-modal').style.display='none'">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        // Adiciona o modal ao corpo do documento
+        document.body.appendChild(modalElement);
+    }
+    
+    // Preenche o select de categorias pai
+    const parentSelect = document.getElementById('newCategoryParent');
+    if (parentSelect) {
+        // Limpa opções anteriores
+        while (parentSelect.options.length > 1) {
+            parentSelect.remove(1);
+        }
+        
+        // Obtém todas as categorias
+        const categories = categoryManager.getAllCategories();
+        
+        // Adiciona as categorias como opções
+        categories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category.id;
+            option.textContent = category.name;
+            parentSelect.appendChild(option);
+        });
+    }
+    
+    // Exibe o modal
+    modalElement.style.display = 'block';
 }
 
 /**
- * Adiciona uma subcategoria
+ * Salva uma nova categoria
  */
-function addSubcategory(parentId) {
-    openCategoryModal(null, parentId);
+async function saveCategory() {
+    // Obtém os valores do formulário
+    const categoryName = document.getElementById('newCategoryName').value.trim();
+    const parentSelect = document.getElementById('newCategoryParent');
+    const parentId = parentSelect.value !== "null" ? parentSelect.value : null;
+    
+    // Verifica se o nome foi fornecido
+    if (!categoryName) {
+        showNotification('Por favor, forneça um nome para a categoria', 'error');
+        return;
+    }
+    
+    try {
+        // Cria o objeto da categoria
+        const category = {
+            name: categoryName,
+            parentId: parentId
+        };
+        
+        // Adiciona a categoria
+        await categoryManager.addCategory(category);
+        
+        // Fecha o modal
+        document.getElementById('category-modal').style.display = 'none';
+        
+        // Atualiza a árvore de categorias
+        await renderCategoriesTree();
+        
+        // Atualiza o select de categorias na seção de produtos
+        updateCategoryFilter();
+        
+        // Mostra notificação de sucesso
+        showNotification('Categoria adicionada com sucesso');
+    } catch (error) {
+        console.error('Erro ao adicionar categoria:', error);
+        showNotification('Erro ao adicionar categoria', 'error');
+    }
 }
 
 /**
@@ -1394,28 +1492,87 @@ async function initOrdersSection() {
 document.addEventListener('DOMContentLoaded', async () => {
     // Inicializa os gerenciadores
     window.categoryManager = new CategoryManager();
-    window.api = new ApiService();
     
     // Carrega as categorias iniciais
     await window.categoryManager.loadCategories();
     
-    // Configura listeners de eventos
-    setupCategoryListeners();
-    setupCarouselListeners();
-    
-    // Adiciona listener para eventos de atualização
-    window.addEventListener('categories-refreshed', () => {
-        refreshCategoryUI();
-    });
-    
     // Inicializa a interface
-    showCategoriesTab();
 });
 
 /**
  * Adiciona uma nova categoria
  */
 async function addCategory() {
+    // Abre um modal para adicionar categoria
+    const mainContent = document.getElementById('main-content');
+    
+    // Cria o modal se não existir
+    let modalElement = document.getElementById('category-modal');
+    if (!modalElement) {
+        modalElement = document.createElement('div');
+        modalElement.id = 'category-modal';
+        modalElement.className = 'modal';
+        
+        // Cria o conteúdo do modal
+        modalElement.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Nova Categoria</h2>
+                    <span class="close" onclick="document.getElementById('category-modal').style.display='none'">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <form id="category-form">
+                        <div class="form-group">
+                            <label for="newCategoryName">Nome da Categoria</label>
+                            <input type="text" id="newCategoryName" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="newCategoryParent">Categoria Pai</label>
+                            <select id="newCategoryParent" name="parentId">
+                                <option value="null">Nenhuma (Categoria Principal)</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" onclick="saveCategory()" class="save-btn">Salvar</button>
+                            <button type="button" class="cancel-btn" onclick="document.getElementById('category-modal').style.display='none'">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        // Adiciona o modal ao corpo do documento
+        document.body.appendChild(modalElement);
+    }
+    
+    // Preenche o select de categorias pai
+    const parentSelect = document.getElementById('newCategoryParent');
+    if (parentSelect) {
+        // Limpa opções anteriores
+        while (parentSelect.options.length > 1) {
+            parentSelect.remove(1);
+        }
+        
+        // Obtém todas as categorias
+        const categories = categoryManager.getAllCategories();
+        
+        // Adiciona as categorias como opções
+        categories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category.id;
+            option.textContent = category.name;
+            parentSelect.appendChild(option);
+        });
+    }
+    
+    // Exibe o modal
+    modalElement.style.display = 'block';
+}
+
+/**
+ * Salva uma nova categoria
+ */
+async function saveCategory() {
     // Obtém os valores do formulário
     const categoryName = document.getElementById('newCategoryName').value.trim();
     const parentSelect = document.getElementById('newCategoryParent');
@@ -1423,22 +1580,34 @@ async function addCategory() {
     
     // Verifica se o nome foi fornecido
     if (!categoryName) {
-        showMessage('Erro ao adicionar categoria', 'Por favor, forneça um nome para a categoria', 'error');
+        showNotification('Por favor, forneça um nome para a categoria', 'error');
         return;
     }
     
     try {
+        // Cria o objeto da categoria
+        const category = {
+            name: categoryName,
+            parentId: parentId
+        };
+        
         // Adiciona a categoria
-        const newCategory = await window.categoryManager.addCategory(categoryName, parentId);
+        await categoryManager.addCategory(category);
         
-        // Limpa o formulário
-        document.getElementById('newCategoryName').value = '';
-        parentSelect.value = "null";
+        // Fecha o modal
+        document.getElementById('category-modal').style.display = 'none';
         
-        showMessage('Sucesso', 'Categoria adicionada com sucesso', 'success');
+        // Atualiza a árvore de categorias
+        await renderCategoriesTree();
+        
+        // Atualiza o select de categorias na seção de produtos
+        updateCategoryFilter();
+        
+        // Mostra notificação de sucesso
+        showNotification('Categoria adicionada com sucesso');
     } catch (error) {
         console.error('Erro ao adicionar categoria:', error);
-        showMessage('Erro ao adicionar categoria', error.message, 'error');
+        showNotification('Erro ao adicionar categoria', 'error');
     }
 }
 

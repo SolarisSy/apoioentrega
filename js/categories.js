@@ -59,13 +59,33 @@ class CategoryManager {
     
     /**
      * Adiciona uma nova categoria
-     * @param {string} name - Nome da categoria
-     * @param {string|null} parentId - ID da categoria pai
+     * @param {Object|string} categoryOrName - Objeto da categoria ou nome da categoria
+     * @param {string|null} parentId - ID da categoria pai (usado apenas se o primeiro parâmetro for string)
      * @returns {Promise<Object>} Categoria adicionada
      */
-    async addCategory(name, parentId = null) {
+    async addCategory(categoryOrName, parentId = null) {
         try {
-            const newCategory = await this.api.addCategory({ name, parentId });
+            let categoryData;
+            
+            // Verifica se o primeiro parâmetro é um objeto ou uma string
+            if (typeof categoryOrName === 'object' && categoryOrName !== null) {
+                // É um objeto, usa diretamente
+                categoryData = categoryOrName;
+            } else {
+                // É uma string (nome da categoria), cria o objeto
+                categoryData = {
+                    name: categoryOrName,
+                    parentId: parentId
+                };
+            }
+            
+            // Garante que o nome está presente e não está vazio
+            if (!categoryData.name || typeof categoryData.name !== 'string' || categoryData.name.trim() === '') {
+                throw new Error('Nome da categoria não pode estar vazio');
+            }
+            
+            // Chama a API para adicionar a categoria
+            const newCategory = await this.api.addCategory(categoryData);
             
             // A atualização automática será feita pelo evento 'categories-updated'
             return newCategory;
