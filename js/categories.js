@@ -40,14 +40,24 @@ class CategoryManager {
      */
     async loadCategories() {
         try {
+            console.log('Iniciando carregamento das categorias...');
             const categories = await this.api.getAllCategories();
+            
+            console.log('Categorias recebidas da API:', categories);
             
             if (Array.isArray(categories)) {
                 this.categories = categories;
+                
+                // Notificar que as categorias foram carregadas
+                window.dispatchEvent(new CustomEvent('categories-loaded', {
+                    detail: { categories: this.categories }
+                }));
+                
+                console.log(`${this.categories.length} categorias carregadas com sucesso`);
                 return this.categories;
             } else {
-                this.categories = [];
                 console.error('Categorias recebidas da API não são um array válido:', categories);
+                this.categories = [];
                 return [];
             }
         } catch (error) {
@@ -429,4 +439,101 @@ function refreshCategoryUI() {
     updateCategorySelects();
     
     console.log('Interface de categorias atualizada');
-} 
+}
+
+// Configurar listener para depuração
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('Iniciando depuração de categorias');
+    
+    // Verificar se a API está inicializada corretamente
+    if (typeof ApiService === 'undefined') {
+        console.error('ERRO: ApiService não está definido!');
+    } else {
+        console.log('ApiService encontrado');
+    }
+    
+    // Verificar se o CategoryManager está inicializado
+    if (typeof window.categoryManager === 'undefined') {
+        console.error('ERRO: window.categoryManager não está definido!');
+        
+        // Tentar criar uma nova instância
+        console.log('Tentando criar uma nova instância de CategoryManager...');
+        window.categoryManager = new CategoryManager();
+    } else {
+        console.log('CategoryManager encontrado');
+    }
+    
+    // Verificar se existem categorias
+    console.log('Status atual do CategoryManager:', {
+        categoriesLength: window.categoryManager.categories?.length,
+        categories: window.categoryManager.categories
+    });
+    
+    // Tentar recarregar as categorias
+    try {
+        console.log('Tentando carregar categorias forçadamente...');
+        const categories = await window.categoryManager.loadCategories();
+        console.log('Resultado do carregamento forçado:', {
+            success: Array.isArray(categories),
+            categoriesLength: categories?.length,
+            categories: categories
+        });
+        
+        // Tentar obter a hierarquia
+        const hierarchy = window.categoryManager.getCategoryHierarchy();
+        console.log('Hierarquia de categorias:', hierarchy);
+        
+        // Tentar renderizar manualmente as categorias se estamos na página inicial
+        const categoryTree = document.getElementById('category-tree');
+        if (categoryTree) {
+            console.log('Elemento category-tree encontrado, tentando renderizar categorias...');
+            
+            // Limpar o container
+            categoryTree.innerHTML = '';
+            
+            if (Array.isArray(hierarchy) && hierarchy.length > 0) {
+                // Tentar renderizar a hierarquia
+                try {
+                    // Criar uma simples lista de categorias
+                    const list = document.createElement('ul');
+                    list.className = 'category-list';
+                    
+                    hierarchy.forEach(category => {
+                        const item = document.createElement('li');
+                        item.className = 'category-item';
+                        item.innerHTML = `<a href="#" data-id="${category.id}" class="category-link">${category.name}</a>`;
+                        
+                        if (category.subcategories && category.subcategories.length > 0) {
+                            item.classList.add('has-subcategories');
+                            
+                            const sublist = document.createElement('ul');
+                            sublist.className = 'subcategories';
+                            
+                            category.subcategories.forEach(subcat => {
+                                const subitem = document.createElement('li');
+                                subitem.innerHTML = `<a href="#" data-id="${subcat.id}" class="category-link">${subcat.name}</a>`;
+                                sublist.appendChild(subitem);
+                            });
+                            
+                            item.appendChild(sublist);
+                        }
+                        
+                        list.appendChild(item);
+                    });
+                    
+                    categoryTree.appendChild(list);
+                    console.log('Categorias renderizadas manualmente com sucesso');
+                } catch (renderError) {
+                    console.error('Erro ao renderizar categorias manualmente:', renderError);
+                }
+            } else {
+                categoryTree.innerHTML = '<p class="empty-message">Nenhuma categoria encontrada.</p>';
+                console.warn('Nenhuma categoria para renderizar');
+            }
+        } else {
+            console.log('Elemento category-tree não encontrado na página');
+        }
+    } catch (error) {
+        console.error('Erro durante depuração de categorias:', error);
+    }
+}); 

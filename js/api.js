@@ -45,26 +45,26 @@ class ApiService {
      * @returns {Promise<Object>} - Resposta da API
      */
     async request(endpoint, method = 'GET', data = null, params = {}, additionalHeaders = {}) {
-        // Corrige a construção da URL para garantir que ela está sendo formada corretamente
-        let apiUrl = '';
+        // Simplificar a construção de URL para evitar problemas
+        let url;
         
-        // Verifica se o endpoint já tem http ou https (URL completa)
+        // Se o endpoint já for uma URL completa, usar diretamente
         if (endpoint.startsWith('http')) {
-            apiUrl = endpoint;
+            url = new URL(endpoint);
         } else {
-            // Garante que há apenas uma barra entre baseUrl e endpoint
-            const baseWithSlash = this.baseUrl.endsWith('/') ? this.baseUrl : `${this.baseUrl}/`;
-            const endpointWithoutSlash = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-            apiUrl = `${window.location.origin}/${baseWithSlash}${endpointWithoutSlash}`;
+            // Construir URL relativa ao servidor
+            const base = window.location.origin;
+            
+            // Remover barras duplas nas URLs
+            const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
+            const cleanBaseUrl = this.baseUrl.startsWith('/') ? this.baseUrl : `/${this.baseUrl}`;
+            const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+            
+            const fullPath = `${cleanBase}${cleanBaseUrl}${cleanEndpoint}`;
+            url = new URL(fullPath);
         }
         
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), this.defaultTimeout);
-        
-        console.log(`Enviando requisição ${method} para: ${apiUrl}`);
-        
-        // Adiciona parâmetros à URL
-        const url = new URL(apiUrl);
+        // Adicionar parâmetros à URL
         if (params) {
             Object.keys(params).forEach(key => {
                 if (params[key] !== null && params[key] !== undefined) {
@@ -72,6 +72,11 @@ class ApiService {
                 }
             });
         }
+        
+        console.log(`Enviando requisição ${method} para: ${url.toString()}`);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.defaultTimeout);
         
         try {
             const options = {
@@ -86,8 +91,10 @@ class ApiService {
                 signal: controller.signal
             };
             
-            if (data && method !== 'GET') {
+            // Adicionar corpo para requisições POST e PUT
+            if (data !== null && (method === 'POST' || method === 'PUT')) {
                 options.body = JSON.stringify(data);
+                console.log(`Dados enviados no ${method}:`, JSON.stringify(data));
             }
             
             const response = await fetch(url.toString(), options);
@@ -108,14 +115,23 @@ class ApiService {
             }
             
             const contentType = response.headers.get('Content-Type');
+            
+            // Se o tipo de conteúdo for JSON, converte a resposta para objeto
             if (contentType && contentType.includes('application/json')) {
                 return await response.json();
             } else {
-                return await response.text();
+                const text = await response.text();
+                // Tenta converter para JSON mesmo assim, caso o servidor não envie o header correto
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    // Se não for JSON, retorna o texto
+                    return text;
+                }
             }
         } catch (error) {
             clearTimeout(timeoutId);
-            console.error(`Erro na requisição para ${endpoint} (${method}):`, error);
+            console.error(`Erro na requisição para ${url.toString()} (${method}):`, error);
             
             // Fornece mensagem de erro mais detalhada
             if (error.name === 'AbortError') {
@@ -357,6 +373,11 @@ class ApiService {
         try {
             console.log('Iniciando adicionar categoria:', category);
             
+            if (!category || !category.name) {
+                console.error('Tentativa de adicionar categoria sem nome');
+                throw new Error('O nome da categoria é obrigatório');
+            }
+            
             // Adiciona timestamp para forçar recarregamento e evitar cache
             const timestamp = Date.now();
             const headers = {
@@ -375,19 +396,24 @@ class ApiService {
             console.log('Enviando dados para adicionar categoria:', categoryData);
             
             // Faz a requisição POST
-            const result = await this.request('categories.php', 'POST', categoryData, {}, headers);
-            
-            console.log('Categoria adicionada com sucesso:', result);
-            
-            // Força recarregamento de categorias após adicionar
-            setTimeout(() => {
-                // Disparar evento de atualização
-                window.dispatchEvent(new CustomEvent('categories-updated', {
-                    detail: { action: 'add', category: result }
-                }));
-            }, 100);
-            
-            return result;
+            try {
+                const result = await this.request('categories.php', 'POST', categoryData, {}, headers);
+                
+                console.log('Categoria adicionada com sucesso:', result);
+                
+                // Força recarregamento de categorias após adicionar
+                setTimeout(() => {
+                    // Disparar evento de atualização
+                    window.dispatchEvent(new CustomEvent('categories-updated', {
+                        detail: { action: 'add', category: result }
+                    }));
+                }, 100);
+                
+                return result;
+            } catch (requestError) {
+                console.error('Erro na requisição ao adicionar categoria:', requestError);
+                throw new Error(`Erro ao comunicar com servidor: ${requestError.message}`);
+            }
         } catch (error) {
             console.error('Erro ao adicionar categoria:', error);
             throw error;

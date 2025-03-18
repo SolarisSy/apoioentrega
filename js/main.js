@@ -211,41 +211,66 @@ function createProductCard(product) {
  * Inicializa o sistema de navegação de categorias
  */
 async function initCategoryNavigation() {
-    console.log('Inicializando sistema de navegação de categorias');
+    console.log('Inicializando sistema de navegação de categorias...');
     
-    // Verifica se o CategoryManager está disponível
-    if (typeof CategoryManager === 'undefined' || !window.categoryManager) {
-        console.error('CategoryManager não está definido ou não foi inicializado corretamente');
-        return;
-    }
-    
-    // Elementos do DOM
+    // Obtém os elementos do DOM
     const categoryTree = document.getElementById('category-tree');
-    const breadcrumb = document.getElementById('category-breadcrumb');
-    const categoryToggle = document.querySelector('.category-navigation-header .toggle-btn');
     const categoryNavigation = document.querySelector('.category-navigation');
+    const categoryToggle = document.querySelector('.toggle-btn');
     
     if (!categoryTree) {
-        console.error('Elemento de navegação de categorias não encontrado');
+        console.warn('Elemento #category-tree não encontrado');
         return;
     }
     
-    // Aguarda o carregamento das categorias (com timeout para evitar espera infinita)
-    let attempts = 0;
-    const maxAttempts = 10;
+    console.log('Garantindo que o gerenciador de categorias está inicializado...');
     
-    while (window.categoryManager.getAllCategories().length === 0 && attempts < maxAttempts) {
-        console.log(`Aguardando carregamento de categorias... Tentativa ${attempts + 1}`);
-        await new Promise(resolve => setTimeout(resolve, 300));
+    // Verifica se o CategoryManager está disponível
+    if (!window.categoryManager) {
+        console.log('Criando nova instância do CategoryManager');
+        window.categoryManager = new CategoryManager();
+    }
+    
+    // Tenta carregar as categorias
+    console.log('Carregando categorias...');
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    // Tenta carregar até conseguir ou atingir o máximo de tentativas
+    while (attempts < maxAttempts) {
+        try {
+            await window.categoryManager.loadCategories();
+            
+            if (window.categoryManager.categories.length > 0) {
+                console.log(`Categorias carregadas com sucesso: ${window.categoryManager.categories.length} categorias`);
+                break;
+            }
+            
+            console.warn(`Tentativa ${attempts + 1}: Nenhuma categoria carregada, tentando novamente...`);
+        } catch (error) {
+            console.error(`Erro ao carregar categorias (tentativa ${attempts + 1}):`, error);
+        }
+        
+        // Espera um pouco antes de tentar novamente
+        await new Promise(resolve => setTimeout(resolve, 1000));
         attempts++;
     }
     
     // Obtém a hierarquia de categorias
     const categoryHierarchy = window.categoryManager.getCategoryHierarchy();
-    console.log('Hierarquia de categorias carregada:', categoryHierarchy);
+    console.log('Hierarquia de categorias:', categoryHierarchy);
+    
+    // Mostra uma mensagem se não houver categorias
+    if (!Array.isArray(categoryHierarchy) || categoryHierarchy.length === 0) {
+        console.warn('Nenhuma categoria encontrada para exibir');
+        categoryTree.innerHTML = '<p class="empty-message">Nenhuma categoria encontrada.</p>';
+        return;
+    }
     
     // Renderiza a árvore de categorias
+    console.log('Renderizando árvore de categorias...');
     renderCategoryTree(categoryTree, categoryHierarchy);
+    console.log('Árvore de categorias renderizada com sucesso');
     
     // Adiciona evento de toggle para dispositivos móveis
     if (categoryToggle && categoryNavigation) {
@@ -266,7 +291,24 @@ async function initCategoryNavigation() {
         filterProducts();
     }
     
+    // Adiciona listeners para cliques nas categorias
+    addCategoryClickListeners();
+    
     console.log('Sistema de navegação de categorias inicializado com sucesso');
+}
+
+/**
+ * Adiciona listeners de clique para as categorias
+ */
+function addCategoryClickListeners() {
+    // Adiciona depois que a árvore foi renderizada
+    document.querySelectorAll('.category-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const categoryId = e.currentTarget.dataset.id;
+            selectCategory(categoryId);
+        });
+    });
 }
 
 /**
