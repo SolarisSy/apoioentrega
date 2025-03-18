@@ -20,7 +20,11 @@ class CategoryManager {
     async loadCategories() {
         try {
             // Carrega as categorias da API
-            this.categories = await window.api.getAllCategories();
+            const categoriesData = await window.api.getAllCategories();
+            
+            // Garante que this.categories seja sempre um array
+            this.categories = Array.isArray(categoriesData) ? categoriesData : [];
+            
             console.log('Categorias carregadas da API:', this.categories.length);
         } catch (error) {
             console.error('Erro ao carregar categorias da API:', error);
@@ -34,18 +38,23 @@ class CategoryManager {
     initDefaultCategories() {
         this.categories = [
             {
-                id: 1,
+                id: 'cat1',
                 name: 'Bags e Mochilas',
                 parentId: null
             },
             {
-                id: 2,
+                id: 'cat2',
                 name: 'Equipamentos de Proteção',
                 parentId: null
             },
             {
-                id: 3,
+                id: 'cat3',
                 name: 'Acessórios',
+                parentId: null
+            },
+            {
+                id: 'cat4',
+                name: 'Peças e Componentes',
                 parentId: null
             }
         ];
@@ -57,7 +66,8 @@ class CategoryManager {
      * @returns {Array} Lista de categorias
      */
     getAllCategories() {
-        return this.categories;
+        // Garante que o retorno seja sempre um array
+        return Array.isArray(this.categories) ? this.categories : [];
     }
 
     /**
@@ -66,6 +76,12 @@ class CategoryManager {
      * @returns {Object|null} Categoria encontrada ou null
      */
     getCategoryById(id) {
+        // Garante que this.categories seja um array antes de usar find
+        if (!Array.isArray(this.categories)) {
+            console.warn('this.categories não é um array em getCategoryById');
+            return null;
+        }
+        
         // Trata IDs numéricos e strings
         if (typeof id === 'string' && id.startsWith('cat') && !isNaN(id.replace('cat', ''))) {
             // Para IDs no formato 'catX'
@@ -88,6 +104,12 @@ class CategoryManager {
      * @returns {Array} Lista de categorias principais
      */
     getMainCategories() {
+        // Garante que this.categories seja um array antes de usar filter
+        if (!Array.isArray(this.categories)) {
+            console.warn('this.categories não é um array em getMainCategories');
+            return [];
+        }
+        
         return this.categories.filter(cat => 
             !cat.parentId || cat.parentId === 'null' || cat.parentId === '0' || cat.parentId === 0
         );
@@ -99,25 +121,28 @@ class CategoryManager {
      * @returns {Array} Lista de subcategorias
      */
     getSubcategories(parentId) {
-        if (!parentId) return [];
-        
-        // Trata IDs numéricos e strings
-        if (typeof parentId === 'string' && parentId.startsWith('cat') && !isNaN(parentId.replace('cat', ''))) {
-            // Para IDs no formato 'catX'
-            const numId = parseInt(parentId.replace('cat', ''));
-            return this.categories.filter(cat => 
-                cat.parentId === parentId || cat.parentId === numId
-            );
-        } else if (!isNaN(parentId)) {
-            // Para IDs numéricos
-            const numId = parseInt(parentId);
-            return this.categories.filter(cat => 
-                cat.parentId === numId || cat.parentId === 'cat' + numId
-            );
+        // Garante que this.categories seja um array antes de usar filter
+        if (!Array.isArray(this.categories)) {
+            console.warn('this.categories não é um array em getSubcategories');
+            return [];
         }
         
-        // Para outros formatos de ID
-        return this.categories.filter(cat => cat.parentId === parentId);
+        // Normaliza os tipos de parentId para comparação
+        if (parentId === undefined || parentId === null) {
+            return [];
+        }
+        
+        // Converte para string para fazer comparações consistentes
+        const parentIdStr = String(parentId);
+        
+        return this.categories.filter(cat => {
+            if (!cat.parentId) return false;
+            
+            // Converte o parentId da categoria para string também
+            const catParentIdStr = String(cat.parentId);
+            
+            return catParentIdStr === parentIdStr;
+        });
     }
 
     /**
@@ -255,12 +280,12 @@ class CategoryManager {
      */
     getCategoryHierarchy() {
         try {
-            console.log('Método getCategoryHierarchy chamado. Total de categorias:', this.categories.length);
+            console.log('Método getCategoryHierarchy chamado. Total de categorias:', Array.isArray(this.categories) ? this.categories.length : 0);
             
-            // Aguarda pelo menos um breve momento para garantir que as categorias foram carregadas
-            if (this.categories.length === 0) {
-                console.log('Nenhuma categoria encontrada, tentando recarregar...');
-                // Se não há categorias, força um recarregamento imediato
+            // Garantir que temos categorias para trabalhar
+            if (!Array.isArray(this.categories) || this.categories.length === 0) {
+                console.log('Nenhuma categoria válida encontrada, tentando recarregar...');
+                // Força um recarregamento imediato
                 this.loadCategories();
                 return []; // Retorna vazio por enquanto
             }
@@ -268,12 +293,17 @@ class CategoryManager {
             const mainCategories = this.getMainCategories();
             console.log('Categorias principais encontradas:', mainCategories.length);
             
+            // Se não houver categorias principais, retorna array vazio
+            if (!Array.isArray(mainCategories) || mainCategories.length === 0) {
+                return [];
+            }
+            
             const hierarchy = mainCategories.map(category => ({
                 ...category,
                 subcategories: this.buildSubcategoryTree(category.id)
             }));
             
-            console.log('Hierarquia de categorias construída:', hierarchy);
+            console.log('Hierarquia de categorias construída com sucesso');
             return hierarchy;
         } catch (error) {
             console.error('Erro ao construir hierarquia de categorias:', error);
@@ -287,7 +317,15 @@ class CategoryManager {
      * @returns {Array} Árvore de subcategorias
      */
     buildSubcategoryTree(categoryId) {
+        if (categoryId === undefined || categoryId === null) {
+            return [];
+        }
+        
         const subcategories = this.getSubcategories(categoryId);
+        
+        if (!Array.isArray(subcategories) || subcategories.length === 0) {
+            return [];
+        }
         
         return subcategories.map(category => ({
             ...category,
@@ -302,10 +340,25 @@ class CategoryManager {
     getFlatCategories() {
         const result = [];
         
+        // Verificar se this.categories é um array válido
+        if (!Array.isArray(this.categories) || this.categories.length === 0) {
+            console.warn('Tentativa de obter categorias planas sem categorias válidas');
+            return result;
+        }
+        
         const addSubcategories = (parentId, level, parentPath) => {
+            // Garantir que obtemos um array válido de subcategorias
             const subcategories = this.getSubcategories(parentId);
             
+            if (!Array.isArray(subcategories)) {
+                return;
+            }
+            
             subcategories.forEach(category => {
+                if (!category || !category.name) {
+                    return; // Pula categorias inválidas
+                }
+                
                 const categoryPath = parentPath ? `${parentPath} > ${category.name}` : category.name;
                 
                 result.push({
@@ -322,17 +375,24 @@ class CategoryManager {
         
         // Adiciona categorias principais (nível 0)
         const mainCategories = this.getMainCategories();
-        mainCategories.forEach(category => {
-            result.push({
-                ...category,
-                level: 0,
-                indent: '',
-                path: category.name
+        
+        if (Array.isArray(mainCategories)) {
+            mainCategories.forEach(category => {
+                if (!category || !category.name) {
+                    return; // Pula categorias inválidas
+                }
+                
+                result.push({
+                    ...category,
+                    level: 0,
+                    indent: '',
+                    path: category.name
+                });
+                
+                // Adiciona subcategorias recursivamente
+                addSubcategories(category.id, 1, category.name);
             });
-            
-            // Adiciona subcategorias
-            addSubcategories(category.id, 1, category.name);
-        });
+        }
         
         return result;
     }

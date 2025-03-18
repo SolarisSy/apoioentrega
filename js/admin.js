@@ -1009,13 +1009,18 @@ async function loadCarouselItems() {
         container.innerHTML = '<p class="loading-message">Carregando itens do carrossel...</p>';
         
         // Obter slides da API
-        const slides = await window.api.getCarouselSlides();
+        let slidesData = await window.api.getCarouselSlides();
         
-        // Ordenar slides por ordem
-        slides.sort((a, b) => (a.order || 0) - (b.order || 0));
+        // Garantir que slidesData é um array
+        slidesData = Array.isArray(slidesData) ? slidesData : [];
+        
+        // Ordenar slides por ordem apenas se for um array
+        if (Array.isArray(slidesData) && slidesData.length > 0) {
+            slidesData.sort((a, b) => (a.order || 0) - (b.order || 0));
+        }
         
         // Verificar se há slides
-        if (!slides || slides.length === 0) {
+        if (!slidesData || slidesData.length === 0) {
             container.innerHTML = '<p class="empty-message">Nenhum item no carrossel. Clique em "Nova Imagem" para adicionar.</p>';
             return;
         }
@@ -1024,7 +1029,7 @@ async function loadCarouselItems() {
         container.innerHTML = '';
         
         // Renderizar cada slide
-        slides.forEach((slide, index) => {
+        slidesData.forEach((slide, index) => {
             const itemElement = document.createElement('div');
             itemElement.className = 'carousel-item-card';
             
@@ -1053,7 +1058,7 @@ async function loadCarouselItems() {
                     <button class="move-btn" onclick="moveCarouselItem(${index}, -1)" ${index === 0 ? 'disabled' : ''}>
                         <i class="fas fa-arrow-up"></i>
                     </button>
-                    <button class="move-btn" onclick="moveCarouselItem(${index}, 1)" ${index === slides.length - 1 ? 'disabled' : ''}>
+                    <button class="move-btn" onclick="moveCarouselItem(${index}, 1)" ${index === slidesData.length - 1 ? 'disabled' : ''}>
                         <i class="fas fa-arrow-down"></i>
                     </button>
                     <button class="edit-btn" onclick="openCarouselModal(${index})">

@@ -5,6 +5,7 @@ class ApiService {
     constructor(baseUrl = 'server') {
         this.baseUrl = baseUrl;
         this.sessionId = this.getOrCreateSessionId();
+        this.defaultTimeout = 10000; // 10 segundos
     }
     
     /**
@@ -63,8 +64,14 @@ class ApiService {
         }
         
         try {
+            // Cria um timeout para a requisição
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), this.defaultTimeout);
+            options.signal = controller.signal;
+            
             // Realiza a requisição
             const response = await fetch(url, options);
+            clearTimeout(timeoutId);
             
             // Verifica se a resposta é JSON
             const contentType = response.headers.get('content-type');
@@ -91,6 +98,21 @@ class ApiService {
         }
     }
     
+    /**
+     * Garante que o resultado seja um array
+     * @param {Function} requestFn - Função de requisição que retorna uma Promise
+     * @returns {Promise<Array>} Array garantido, mesmo em caso de erro
+     */
+    async ensureArray(requestFn) {
+        try {
+            const result = await requestFn();
+            return Array.isArray(result) ? result : [];
+        } catch (error) {
+            console.error('Erro ao obter dados:', error);
+            return [];
+        }
+    }
+    
     // Métodos específicos para produtos
     
     /**
@@ -98,7 +120,7 @@ class ApiService {
      * @returns {Promise<Array>} Lista de produtos
      */
     async getAllProducts() {
-        return this.request('products.php');
+        return this.ensureArray(() => this.request('products.php'));
     }
     
     /**
@@ -116,7 +138,7 @@ class ApiService {
      * @returns {Promise<Array>} Lista de produtos
      */
     async getProductsByCategory(categoryId) {
-        return this.request('products.php', 'GET', null, { category: categoryId });
+        return this.ensureArray(() => this.request('products.php', 'GET', null, { category: categoryId }));
     }
     
     /**
@@ -162,7 +184,7 @@ class ApiService {
      * @returns {Promise<Array>} Lista de categorias
      */
     async getAllCategories() {
-        return this.request('categories.php');
+        return this.ensureArray(() => this.request('categories.php'));
     }
     
     /**
@@ -282,7 +304,7 @@ class ApiService {
      * @returns {Promise<Array>} Lista de slides
      */
     async getCarouselSlides() {
-        return this.request('carousel.php');
+        return this.ensureArray(() => this.request('carousel.php'));
     }
     
     /**
