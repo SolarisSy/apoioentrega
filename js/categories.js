@@ -25,9 +25,37 @@ class CategoryManager {
             // Garante que this.categories seja sempre um array
             this.categories = Array.isArray(categoriesData) ? categoriesData : [];
             
-            console.log('Categorias carregadas da API:', this.categories.length);
+            // Se não obteve categorias, tenta inicializar com categorias padrão
+            if (this.categories.length === 0) {
+                console.warn('Nenhuma categoria recebida da API, inicializando categorias padrão');
+                this.initDefaultCategories();
+            } else {
+                console.log('Categorias carregadas da API:', this.categories.length);
+            }
+            
+            // Sincroniza com localStorage para persistência local 
+            // (útil para quando o servidor estiver offline)
+            try {
+                localStorage.setItem('localCategories', JSON.stringify(this.categories));
+            } catch (storageError) {
+                console.error('Erro ao salvar categorias no localStorage:', storageError);
+            }
         } catch (error) {
             console.error('Erro ao carregar categorias da API:', error);
+            
+            // Tenta ler categorias do localStorage primeiro
+            try {
+                const localCategories = JSON.parse(localStorage.getItem('localCategories') || '[]');
+                if (localCategories.length > 0) {
+                    console.log('Carregando categorias do localStorage:', localCategories.length);
+                    this.categories = localCategories;
+                    return;
+                }
+            } catch (localError) {
+                console.error('Erro ao ler categorias do localStorage:', localError);
+            }
+            
+            // Se não tiver no localStorage, inicializa categorias padrão
             this.initDefaultCategories();
         }
     }
@@ -200,6 +228,26 @@ class CategoryManager {
             return addedCategory;
         } catch (error) {
             console.error('Erro ao adicionar categoria:', error);
+            
+            // Se falhou, tenta obter a categoria que foi adicionada pelo fallback local
+            try {
+                const localCategories = JSON.parse(localStorage.getItem('localCategories') || '[]');
+                const recentlyAdded = localCategories.find(cat => 
+                    cat.name === name && 
+                    cat.parentId === parentId &&
+                    cat.createdAt && // Categorias criadas pelo fallback terão este campo
+                    new Date(cat.createdAt) > new Date(Date.now() - 60000) // Criadas no último minuto
+                );
+                
+                if (recentlyAdded) {
+                    // Atualiza a lista local
+                    await this.loadCategories();
+                    return recentlyAdded;
+                }
+            } catch (localError) {
+                console.error('Erro ao verificar categoria adicionada localmente:', localError);
+            }
+            
             throw error;
         }
     }
@@ -236,6 +284,25 @@ class CategoryManager {
             return updatedCategory;
         } catch (error) {
             console.error('Erro ao atualizar categoria:', error);
+            
+            // Tenta atualizar na lista local
+            try {
+                if (this.categories) {
+                    const index = this.categories.findIndex(cat => cat.id === id);
+                    if (index !== -1) {
+                        this.categories[index].name = name;
+                        this.categories[index].updatedAt = new Date().toISOString();
+                        
+                        // Atualiza localStorage
+                        localStorage.setItem('localCategories', JSON.stringify(this.categories));
+                        
+                        return this.categories[index];
+                    }
+                }
+            } catch (localError) {
+                console.error('Erro ao atualizar categoria localmente:', localError);
+            }
+            
             throw error;
         }
     }
@@ -270,7 +337,41 @@ class CategoryManager {
             return response;
         } catch (error) {
             console.error('Erro ao remover categoria:', error);
-            throw error;
+            
+            // Tenta remover localmente quando a API falha
+            try {
+                // Backup das categorias antes da exclusão
+                const oldCategories = [...this.categories];
+                
+                // Remove a categoria
+                this.categories = this.categories.filter(cat => cat.id !== id);
+                
+                // Atualiza subcategorias se necessário
+                if (updateSubcategories) {
+                    this.categories = this.categories.map(cat => {
+                        if (cat.parentId === id) {
+                            return { ...cat, parentId: newParentId };
+                        }
+                        return cat;
+                    });
+                }
+                
+                // Atualiza localStorage
+                localStorage.setItem('localCategories', JSON.stringify(this.categories));
+                
+                // Atualiza os caminhos de categoria dos produtos
+                if (typeof ProductManager !== 'undefined' && window.productManager) {
+                    if (typeof window.productManager.updateProductCategoryPaths === 'function') {
+                        window.productManager.updateProductCategoryPaths();
+                    }
+                }
+                
+                // Se tudo funcionou, retorna sucesso
+                return { success: true, message: 'Categoria excluída localmente' };
+            } catch (localError) {
+                console.error('Erro ao excluir categoria localmente:', localError);
+                throw error;
+            }
         }
     }
 

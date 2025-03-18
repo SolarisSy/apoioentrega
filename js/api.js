@@ -247,7 +247,57 @@ class ApiService {
             }
         ];
         
-        return this.ensureArray(() => this.request('categories.php'), fallbackCategories);
+        try {
+            // Tenta obter da API
+            const apiCategories = await this.request('categories.php');
+            if (Array.isArray(apiCategories) && apiCategories.length > 0) {
+                return apiCategories;
+            }
+            
+            // Se API retornou array vazio, combina fallback com localStorage
+            let localCategories = [];
+            try {
+                localCategories = JSON.parse(localStorage.getItem('localCategories') || '[]');
+            } catch (e) {
+                console.warn('Erro ao ler categorias do localStorage:', e);
+            }
+            
+            // Combina fallback e localStorage, evitando duplicatas por ID
+            const combinedCategories = [...fallbackCategories];
+            const fallbackIds = new Set(fallbackCategories.map(cat => cat.id));
+            
+            // Adiciona categorias locais que não estão no fallback
+            localCategories.forEach(localCat => {
+                if (!fallbackIds.has(localCat.id)) {
+                    combinedCategories.push(localCat);
+                }
+            });
+            
+            return combinedCategories;
+        } catch (error) {
+            console.warn('Erro ao obter categorias da API, usando fallback:', error);
+            
+            // Tenta combinar fallback com localStorage
+            try {
+                const localCategories = JSON.parse(localStorage.getItem('localCategories') || '[]');
+                
+                // Combina fallback e localStorage, evitando duplicatas por ID
+                const combinedCategories = [...fallbackCategories];
+                const fallbackIds = new Set(fallbackCategories.map(cat => cat.id));
+                
+                // Adiciona categorias locais que não estão no fallback
+                localCategories.forEach(localCat => {
+                    if (!fallbackIds.has(localCat.id)) {
+                        combinedCategories.push(localCat);
+                    }
+                });
+                
+                return combinedCategories;
+            } catch (storageError) {
+                console.error('Erro ao ler categorias do localStorage:', storageError);
+                return fallbackCategories;
+            }
+        }
     }
     
     /**
@@ -314,7 +364,36 @@ class ApiService {
      * @returns {Promise<Object>} Categoria atualizada
      */
     async updateCategory(category) {
-        return this.request('categories.php', 'PUT', category);
+        try {
+            return await this.request('categories.php', 'PUT', category);
+        } catch (error) {
+            console.warn('Erro ao atualizar categoria via API, usando fallback local:', error);
+            
+            // Fallback: simula atualização local quando a API falha
+            try {
+                let localCategories = JSON.parse(localStorage.getItem('localCategories') || '[]');
+                const index = localCategories.findIndex(cat => cat.id === category.id);
+                
+                if (index !== -1) {
+                    localCategories[index] = {
+                        ...localCategories[index],
+                        ...category,
+                        updatedAt: new Date().toISOString()
+                    };
+                } else {
+                    // Se não encontrou, talvez seja uma categoria do fallback inicial
+                    // Adiciona como nova
+                    category.updatedAt = new Date().toISOString();
+                    localCategories.push(category);
+                }
+                
+                localStorage.setItem('localCategories', JSON.stringify(localCategories));
+            } catch (storageError) {
+                console.error('Erro ao atualizar categoria no localStorage:', storageError);
+            }
+            
+            return category;
+        }
     }
     
     /**
@@ -334,7 +413,39 @@ class ApiService {
             }
         }
         
-        return this.request('categories.php', 'DELETE', null, params);
+        try {
+            return await this.request('categories.php', 'DELETE', null, params);
+        } catch (error) {
+            console.warn('Erro ao excluir categoria via API, usando fallback local:', error);
+            
+            // Fallback: simula exclusão local quando a API falha
+            try {
+                let localCategories = JSON.parse(localStorage.getItem('localCategories') || '[]');
+                
+                // Remove a categoria
+                localCategories = localCategories.filter(cat => cat.id !== id);
+                
+                // Se precisar atualizar subcategorias
+                if (updateSubcategories) {
+                    localCategories = localCategories.map(cat => {
+                        if (cat.parentId === id) {
+                            return {
+                                ...cat,
+                                parentId: newParentId,
+                                updatedAt: new Date().toISOString()
+                            };
+                        }
+                        return cat;
+                    });
+                }
+                
+                localStorage.setItem('localCategories', JSON.stringify(localCategories));
+            } catch (storageError) {
+                console.error('Erro ao excluir categoria no localStorage:', storageError);
+            }
+            
+            return { success: true, message: 'Categoria excluída localmente' };
+        }
     }
     
     // Métodos específicos para o carrinho
