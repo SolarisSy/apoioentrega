@@ -1,1 +1,7 @@
- 
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300" height="300" viewBox="0 0 300 300">
+  <rect x="0" y="0" width="300" height="300" fill="#F5F5F5" />
+  <path d="M150,70 L230,180 L70,180 Z" fill="#CCCCCC" />
+  <circle cx="210" cy="100" r="20" fill="#CCCCCC" />
+  <text x="150" y="220" font-family="Arial, sans-serif" font-weight="bold" font-size="20" fill="#888888" text-anchor="middle">Imagem indisponível</text>
+</svg> 

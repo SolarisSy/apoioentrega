@@ -1,1 +1,8 @@
- 
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="200" height="200" viewBox="0 0 200 200">
+  <rect x="0" y="0" width="200" height="200" fill="#32BCAD" />
+  <path d="M60,70 L90,70 L90,130 L60,130 Z" fill="white" />
+  <path d="M110,70 L140,70 L140,130 L110,130 Z" fill="white" />
+  <path d="M60,70 L140,70 L100,45 Z" fill="white" />
+  <path d="M60,130 L140,130 L100,155 Z" fill="white" />
+</svg> 

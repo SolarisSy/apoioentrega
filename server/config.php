@@ -1,12 +1,24 @@
 <?php
-// Configurações básicas do servidor
+// Configurações básicas do servidor - mais permissivas
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+
+// Responder automaticamente a requisições OPTIONS
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
 
 // Constantes
 define('DATA_DIR', __DIR__ . '/data/');
+
+// Garantir que o diretório de dados exista e tenha permissões adequadas
+if (!is_dir(DATA_DIR)) {
+    mkdir(DATA_DIR, 0777, true);
+}
+chmod(DATA_DIR, 0777);
 
 // Função para ler um arquivo JSON
 function readJsonFile($filename) {
@@ -29,10 +41,12 @@ function saveJsonFile($filename, $data) {
     
     // Cria o diretório se não existir
     if (!is_dir(DATA_DIR)) {
-        mkdir(DATA_DIR, 0755, true);
+        mkdir(DATA_DIR, 0777, true);
     }
     
     $result = file_put_contents($filePath, json_encode($data, JSON_PRETTY_PRINT));
+    // Definir permissões de arquivo
+    chmod($filePath, 0666);
     return $result !== false;
 }
 
