@@ -19,7 +19,10 @@ class ProductManager {
     async loadProducts() {
         try {
             // Carrega os produtos da API
-            this.products = await window.api.getAllProducts();
+            const apiResponse = await window.api.getAllProducts();
+            
+            // Garante que os produtos sejam tratados como array
+            this.products = Array.isArray(apiResponse) ? apiResponse : Object.values(apiResponse || {});
             
             // Processa as imagens dos produtos
             this.products.forEach(product => {

@@ -76,6 +76,14 @@ class ApiService {
                     throw new Error(result.error || 'Erro na requisição');
                 }
                 
+                // Processa o resultado para garantir que arrays sejam tratados corretamente
+                if (result && typeof result === 'object') {
+                    // Se result for um objeto com índices numéricos, converte para array
+                    if (Object.keys(result).every(key => !isNaN(parseInt(key)))) {
+                        return Object.values(result);
+                    }
+                }
+                
                 return result;
             } else {
                 // Resposta não é JSON

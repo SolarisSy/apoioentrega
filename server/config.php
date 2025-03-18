@@ -39,7 +39,19 @@ function saveJsonFile($filename, $data) {
 // Função para responder com JSON
 function jsonResponse($data, $statusCode = 200) {
     http_response_code($statusCode);
-    echo json_encode($data);
+    
+    // Garantir que arrays associativos sejam tratados corretamente
+    if (is_array($data)) {
+        // Verificar se é um array associativo
+        $isAssoc = array_keys($data) !== range(0, count($data) - 1);
+        
+        // Se for associativo e não vazio, converter para array numérico
+        if ($isAssoc && !empty($data)) {
+            $data = array_values($data);
+        }
+    }
+    
+    echo json_encode($data, JSON_NUMERIC_CHECK);
     exit;
 }
 
