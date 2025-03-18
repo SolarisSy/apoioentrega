@@ -3,7 +3,18 @@
  */
 class ApiService {
     constructor(baseUrl = 'server') {
-        this.baseUrl = baseUrl;
+        // Verifica se a aplicação está rodando no ambiente de produção ou local
+        const isProduction = window.location.hostname !== 'localhost' && 
+                            !window.location.hostname.includes('127.0.0.1');
+        
+        if (isProduction) {
+            // Em produção, usa a URL relativa
+            this.baseUrl = baseUrl;
+        } else {
+            // Em ambiente local, usa a URL completa do servidor local
+            this.baseUrl = baseUrl;
+        }
+        
         this.sessionId = this.getOrCreateSessionId();
         this.defaultTimeout = 10000; // 10 segundos
     }
@@ -34,15 +45,31 @@ class ApiService {
      * @returns {Promise<Object>} - Resposta da API
      */
     async request(endpoint, method = 'GET', data = null, params = {}, additionalHeaders = {}) {
-        const apiUrl = this.baseUrl + endpoint;
+        // Corrige a construção da URL para garantir que ela está sendo formada corretamente
+        let apiUrl = '';
+        
+        // Verifica se o endpoint já tem http ou https (URL completa)
+        if (endpoint.startsWith('http')) {
+            apiUrl = endpoint;
+        } else {
+            // Garante que há apenas uma barra entre baseUrl e endpoint
+            const baseWithSlash = this.baseUrl.endsWith('/') ? this.baseUrl : `${this.baseUrl}/`;
+            const endpointWithoutSlash = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+            apiUrl = `${window.location.origin}/${baseWithSlash}${endpointWithoutSlash}`;
+        }
+        
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.defaultTimeout);
         
+        console.log(`Enviando requisição ${method} para: ${apiUrl}`);
+        
         // Adiciona parâmetros à URL
-        const url = new URL(apiUrl, window.location.origin);
+        const url = new URL(apiUrl);
         if (params) {
             Object.keys(params).forEach(key => {
-                url.searchParams.append(key, params[key]);
+                if (params[key] !== null && params[key] !== undefined) {
+                    url.searchParams.append(key, params[key]);
+                }
             });
         }
         
@@ -67,7 +94,17 @@ class ApiService {
             clearTimeout(timeoutId);
             
             if (!response.ok) {
-                throw new Error(`Erro na resposta: ${response.status} ${response.statusText}`);
+                const errorMessage = `Erro na resposta: ${response.status} ${response.statusText}`;
+                console.error(errorMessage);
+                
+                // Tenta ler o corpo da resposta para mais detalhes
+                try {
+                    const errorBody = await response.text();
+                    console.error('Detalhes do erro:', errorBody);
+                    throw new Error(`${errorMessage} - ${errorBody}`);
+                } catch (e) {
+                    throw new Error(errorMessage);
+                }
             }
             
             const contentType = response.headers.get('Content-Type');
@@ -78,8 +115,14 @@ class ApiService {
             }
         } catch (error) {
             clearTimeout(timeoutId);
-            console.error(`Erro na requisição para ${endpoint}:`, error);
-            throw new Error('Erro na requisição');
+            console.error(`Erro na requisição para ${endpoint} (${method}):`, error);
+            
+            // Fornece mensagem de erro mais detalhada
+            if (error.name === 'AbortError') {
+                throw new Error(`Requisição para ${endpoint} excedeu o tempo limite`);
+            } else {
+                throw new Error(`Erro na requisição para ${endpoint}: ${error.message}`);
+            }
         }
     }
     
@@ -312,6 +355,8 @@ class ApiService {
      */
     async addCategory(category) {
         try {
+            console.log('Iniciando adicionar categoria:', category);
+            
             // Adiciona timestamp para forçar recarregamento e evitar cache
             const timestamp = Date.now();
             const headers = {
@@ -320,8 +365,19 @@ class ApiService {
                 'Expires': '0'
             };
             
-            // Modifica a função request para incluir os headers
-            const result = await this.request('categories.php', 'POST', {...category, timestamp}, {}, headers);
+            // Preparar os dados, garantindo que o campo name está presente
+            const categoryData = {
+                ...category,
+                timestamp,
+                name: category.name?.trim() || ''
+            };
+            
+            console.log('Enviando dados para adicionar categoria:', categoryData);
+            
+            // Faz a requisição POST
+            const result = await this.request('categories.php', 'POST', categoryData, {}, headers);
+            
+            console.log('Categoria adicionada com sucesso:', result);
             
             // Força recarregamento de categorias após adicionar
             setTimeout(() => {
@@ -333,7 +389,7 @@ class ApiService {
             
             return result;
         } catch (error) {
-            console.warn('Erro ao adicionar categoria:', error);
+            console.error('Erro ao adicionar categoria:', error);
             throw error;
         }
     }
@@ -371,7 +427,7 @@ class ApiService {
     }
     
     /**
-     * Remove uma categoria
+     * Exclui uma categoria
      * @param {string|number} id - ID da categoria
      * @param {boolean} updateSubcategories - Se deve atualizar subcategorias
      * @param {string|number} newParentId - Novo ID de categoria pai para subcategorias
@@ -379,7 +435,7 @@ class ApiService {
      */
     async deleteCategory(id, updateSubcategories = false, newParentId = null) {
         const params = { 
-            id, 
+            id,
             timestamp: Date.now(), // Adiciona timestamp para forçar recarregamento e evitar cache
         };
         
@@ -391,6 +447,8 @@ class ApiService {
         }
         
         try {
+            console.log(`Tentando excluir categoria: ${id}`);
+            
             const headers = {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache',
@@ -398,6 +456,8 @@ class ApiService {
             };
             
             const result = await this.request('categories.php', 'DELETE', null, params, headers);
+            
+            console.log(`Categoria excluída com sucesso: ${id}`, result);
             
             // Força recarregamento de categorias após deletar
             setTimeout(() => {
@@ -409,7 +469,7 @@ class ApiService {
             
             return result;
         } catch (error) {
-            console.warn('Erro ao excluir categoria:', error);
+            console.error(`Erro ao excluir categoria ${id}:`, error);
             throw error;
         }
     }
