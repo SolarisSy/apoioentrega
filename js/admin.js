@@ -382,35 +382,19 @@ async function renderCategoriesTree() {
     if (!container) return;
     
     try {
-        // Mostrar indicador de carregamento
-        container.innerHTML = '<p class="loading-message">Carregando categorias...</p>';
+        // Obtém a hierarquia de categorias
+        const hierarchy = categoryManager.getCategoryHierarchy();
         
-        // Obter hierarquia de categorias
-        const hierarchy = await categoryManager.getCategoryHierarchy();
-        
-        // Verificar se há categorias
-        if (!hierarchy || hierarchy.length === 0) {
-            container.innerHTML = '<p class="empty-message">Nenhuma categoria encontrada. Clique em "Nova Categoria" para adicionar.</p>';
-            return;
-        }
-        
-        // Limpar container
+        // Limpa o container
         container.innerHTML = '';
         
-        // Construir árvore de categorias
-        const categoriesTree = document.createElement('ul');
-        categoriesTree.className = 'categories-tree';
-        
-        // Adicionar categorias à árvore
+        // Renderiza cada categoria principal
         hierarchy.forEach(category => {
-            const categoryNode = createCategoryNode(category);
-            categoriesTree.appendChild(categoryNode);
+            container.appendChild(createCategoryNode(category));
         });
-        
-        container.appendChild(categoriesTree);
     } catch (error) {
-        console.error('Erro ao construir hierarquia de categorias:', error);
-        container.innerHTML = '<p class="error-message">Erro ao carregar categorias. Tente novamente mais tarde.</p>';
+        console.error('Erro ao renderizar categorias:', error);
+        showNotification('Erro ao carregar categorias', 'error');
     }
 }
 
@@ -1025,10 +1009,7 @@ async function loadCarouselItems() {
         container.innerHTML = '<p class="loading-message">Carregando itens do carrossel...</p>';
         
         // Obter slides da API
-        const apiResponse = await window.api.getCarouselSlides();
-        
-        // Garante que os slides sejam tratados como array
-        const slides = Array.isArray(apiResponse) ? apiResponse : Object.values(apiResponse || {});
+        const slides = await window.api.getCarouselSlides();
         
         // Ordenar slides por ordem
         slides.sort((a, b) => (a.order || 0) - (b.order || 0));
